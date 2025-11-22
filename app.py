@@ -21,8 +21,6 @@ try:
     import ffmpeg
     import chromadb
     from chromadb.config import Settings
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
-    from langchain.embeddings import OpenAIEmbeddings
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaIoBaseDownload
     from google.oauth2 import service_account
