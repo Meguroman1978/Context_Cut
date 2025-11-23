@@ -110,6 +110,46 @@ def extract_google_drive_id(url: str) -> Optional[Dict[str, str]]:
     return None
 
 
+def check_gcp_credentials() -> Dict[str, any]:
+    """GCP認証情報の状態をチェック"""
+    result = {
+        "has_credentials": False,
+        "is_valid": False,
+        "error": None,
+        "project_id": None,
+        "client_email": None
+    }
+    
+    try:
+        if "gcp_service_account" not in st.secrets:
+            result["error"] = "認証情報が設定されていません"
+            return result
+        
+        result["has_credentials"] = True
+        credentials_dict = dict(st.secrets["gcp_service_account"])
+        
+        # 基本情報を取得
+        result["project_id"] = credentials_dict.get("project_id", "不明")
+        result["client_email"] = credentials_dict.get("client_email", "不明")
+        
+        # 認証情報の妥当性をテスト
+        credentials = service_account.Credentials.from_service_account_info(
+            credentials_dict,
+            scopes=['https://www.googleapis.com/auth/drive.readonly']
+        )
+        service = build('drive', 'v3', credentials=credentials)
+        
+        # 簡単なAPIコールでテスト（自分のDriveルート情報を取得）
+        service.files().list(pageSize=1).execute()
+        
+        result["is_valid"] = True
+        return result
+        
+    except Exception as e:
+        result["error"] = str(e)
+        return result
+
+
 def list_videos_in_folder(folder_id: str, service) -> List[Dict[str, str]]:
     """フォルダ内の動画ファイル一覧を取得"""
     try:
@@ -440,24 +480,111 @@ def main():
         )
         
         if video_source == "Google Drive URL":
-            gdrive_url = st.text_input("Google Drive URL (ファイルまたはフォルダ)")
+            # 認証情報の状態確認
+            st.subheader("🔐 認証情報の確認")
             
-            if st.button("URLを解析"):
-                result = extract_google_drive_id(gdrive_url)
-                if result:
-                    if result['type'] == 'file':
-                        # ファイルの場合は直接ダウンロード
-                        st.session_state.gdrive_result = result
-                        st.session_state.gdrive_selected_file = result['id']
-                        st.info("✅ ファイルURLを検出しました。「ダウンロード」ボタンをクリックしてください。")
-                    elif result['type'] == 'folder':
-                        # フォルダの場合は動画一覧を取得
-                        st.session_state.gdrive_result = result
-                        with st.spinner("フォルダ内の動画を検索中..."):
-                            try:
-                                if "gcp_service_account" not in st.secrets:
-                                    st.error("Google Cloud認証情報が設定されていません。")
-                                else:
+            cred_status = check_gcp_credentials()
+            
+            if cred_status["has_credentials"]:
+                if cred_status["is_valid"]:
+                    st.success("✅ Google Cloud認証情報: 有効")
+                    with st.expander("📋 認証情報の詳細"):
+                        st.write(f"**プロジェクトID**: `{cred_status['project_id']}`")
+                        st.write(f"**サービスアカウント**: `{cred_status['client_email']}`")
+                        st.info("✓ Google Drive APIへの接続テスト: 成功")
+                else:
+                    st.error(f"❌ 認証情報は設定されていますが、無効です")
+                    st.error(f"エラー: {cred_status['error']}")
+                    with st.expander("🔧 トラブルシューティング"):
+                        st.markdown("""
+                        **考えられる原因**:
+                        - 認証情報が正しくない形式
+                        - サービスアカウントが無効化されている
+                        - Google Drive APIが有効化されていない
+                        
+                        **対処方法**:
+                        1. GCPコンソールでサービスアカウントを確認
+                        2. Google Drive APIが有効か確認
+                        3. 新しいJSONキーを生成して再設定
+                        """)
+            else:
+                st.warning("⚠️ Google Cloud認証情報が設定されていません")
+                
+                with st.expander("📖 認証情報の設定方法", expanded=True):
+                    st.markdown("""
+                    ### Google Drive連携を使用するには、GCP認証情報が必要です
+                    
+                    #### 🔧 設定手順:
+                    
+                    **Step 1: Google Cloud Platformでサービスアカウントを作成**
+                    
+                    1. [Google Cloud Console](https://console.cloud.google.com/) にアクセス
+                    2. プロジェクトを作成または選択
+                    3. 「APIとサービス」→「ライブラリ」→「Google Drive API」を検索して有効化
+                    4. 「APIとサービス」→「認証情報」
+                    5. 「認証情報を作成」→「サービスアカウント」
+                    6. 名前を入力（例: `context-cut-pro`）
+                    7. 役割: 「閲覧者」を選択
+                    8. 「完了」をクリック
+                    9. 作成したサービスアカウントをクリック
+                    10. 「キー」タブ → 「鍵を追加」→「新しい鍵を作成」
+                    11. **JSON** を選択してダウンロード
+                    
+                    **Step 2: Streamlit Cloudで認証情報を設定**
+                    
+                    1. Streamlit Cloudのアプリ画面で「Settings」（⚙️）をクリック
+                    2. 「Secrets」を選択
+                    3. 以下の形式でJSONキーをTOML形式に変換して貼り付け:
+                    
+                    ```toml
+                    [gcp_service_account]
+                    type = "service_account"
+                    project_id = "your-project-id"
+                    private_key_id = "your-private-key-id"
+                    private_key = "-----BEGIN PRIVATE KEY-----\\nYour-Key-Here\\n-----END PRIVATE KEY-----\\n"
+                    client_email = "your-service-account@your-project.iam.gserviceaccount.com"
+                    client_id = "123456789..."
+                    auth_uri = "https://accounts.google.com/o/oauth2/auth"
+                    token_uri = "https://oauth2.googleapis.com/token"
+                    auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+                    client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/..."
+                    ```
+                    
+                    4. 「Save」をクリック
+                    5. アプリが自動的に再起動されます
+                    
+                    **Step 3: Google Driveで共有設定**
+                    
+                    - サービスアカウントのメールアドレス（`xxx@xxx.iam.gserviceaccount.com`）に、
+                      対象の動画ファイルまたはフォルダを「閲覧者」として共有してください
+                    
+                    ---
+                    
+                    💡 **詳しい手順は、リポジトリの `DEPLOYMENT_GUIDE.md` を参照してください**
+                    """)
+                
+                st.info("💡 認証情報を設定せずに、「ローカルファイル」または「Web URL」でも動画を取得できます")
+            
+            st.divider()
+            
+            # Google Drive URL入力（認証情報が有効な場合のみ）
+            if cred_status["is_valid"]:
+                st.subheader("📥 Google Drive URL")
+                gdrive_url = st.text_input("Google Drive URL (ファイルまたはフォルダ)")
+                
+                if st.button("URLを解析"):
+                    result = extract_google_drive_id(gdrive_url)
+                    if result:
+                        if result['type'] == 'file':
+                            # ファイルの場合は直接ダウンロード
+                            st.session_state.gdrive_result = result
+                            st.session_state.gdrive_selected_file = result['id']
+                            st.info("✅ ファイルURLを検出しました。「ダウンロード」ボタンをクリックしてください。")
+                        elif result['type'] == 'folder':
+                            # フォルダの場合は動画一覧を取得
+                            st.session_state.gdrive_result = result
+                            with st.spinner("フォルダ内の動画を検索中..."):
+                                try:
                                     credentials_dict = dict(st.secrets["gcp_service_account"])
                                     credentials = service_account.Credentials.from_service_account_info(
                                         credentials_dict,
@@ -471,33 +598,37 @@ def main():
                                         st.success(f"✅ {len(videos)}件の動画ファイルが見つかりました。")
                                     else:
                                         st.warning("フォルダ内に動画ファイルが見つかりませんでした。")
-                            except Exception as e:
-                                st.error(f"フォルダの読み込みに失敗しました: {e}")
-                else:
-                    st.error("無効なGoogle Drive URLです。ファイルまたはフォルダのURLを入力してください。")
-            
-            # フォルダから動画を選択
-            if 'gdrive_folder_videos' in st.session_state and st.session_state.gdrive_folder_videos:
-                st.subheader("📂 フォルダ内の動画を選択")
-                video_names = [f"{v['name']} ({int(v['size'])//1024//1024}MB)" if v['size'] else v['name'] 
-                              for v in st.session_state.gdrive_folder_videos]
-                selected_idx = st.selectbox("動画を選択", range(len(video_names)), 
-                                           format_func=lambda i: video_names[i])
-                st.session_state.gdrive_selected_file = st.session_state.gdrive_folder_videos[selected_idx]['id']
-            
-            # ダウンロード実行
-            if 'gdrive_selected_file' in st.session_state:
-                if st.button("ダウンロード"):
-                    file_id = st.session_state.gdrive_selected_file
-                    output_path = str(TEMP_VIDEOS_DIR / f"video_{file_id}.mp4")
-                    if download_from_google_drive(file_id, output_path):
-                        st.session_state.video_path = output_path
-                        st.success("✅ ダウンロード完了!")
-                        # セッション状態をクリア
-                        if 'gdrive_folder_videos' in st.session_state:
-                            del st.session_state.gdrive_folder_videos
-                        if 'gdrive_selected_file' in st.session_state:
-                            del st.session_state.gdrive_selected_file
+                                except Exception as e:
+                                    st.error(f"フォルダの読み込みに失敗しました: {e}")
+                                    st.info("💡 サービスアカウントにフォルダの共有権限があるか確認してください")
+                    else:
+                        st.error("無効なGoogle Drive URLです。ファイルまたはフォルダのURLを入力してください。")
+                
+                # フォルダから動画を選択
+                if 'gdrive_folder_videos' in st.session_state and st.session_state.gdrive_folder_videos:
+                    st.subheader("📂 フォルダ内の動画を選択")
+                    video_names = [f"{v['name']} ({int(v['size'])//1024//1024}MB)" if v['size'] else v['name'] 
+                                  for v in st.session_state.gdrive_folder_videos]
+                    selected_idx = st.selectbox("動画を選択", range(len(video_names)), 
+                                               format_func=lambda i: video_names[i])
+                    st.session_state.gdrive_selected_file = st.session_state.gdrive_folder_videos[selected_idx]['id']
+                
+                # ダウンロード実行
+                if 'gdrive_selected_file' in st.session_state:
+                    if st.button("ダウンロード"):
+                        file_id = st.session_state.gdrive_selected_file
+                        output_path = str(TEMP_VIDEOS_DIR / f"video_{file_id}.mp4")
+                        if download_from_google_drive(file_id, output_path):
+                            st.session_state.video_path = output_path
+                            st.success("✅ ダウンロード完了!")
+                            # セッション状態をクリア
+                            if 'gdrive_folder_videos' in st.session_state:
+                                del st.session_state.gdrive_folder_videos
+                            if 'gdrive_selected_file' in st.session_state:
+                                del st.session_state.gdrive_selected_file
+            else:
+                st.warning("⚠️ Google Drive機能を使用するには、上記の手順で認証情報を設定してください。")
+                st.info("📌 認証情報なしでも、「Web URL（YouTube等）」または「ローカルファイル」は利用できます。")
         
         elif video_source == "Web URL（YouTube等）":
             web_url = st.text_input("動画URL")
