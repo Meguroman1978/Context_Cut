@@ -82,18 +82,66 @@ def save_uploaded_font(uploaded_file) -> bool:
         return False
 
 
-def extract_google_drive_id(url: str) -> Optional[str]:
-    """Google Drive URLからファイルIDを抽出"""
-    patterns = [
+def extract_google_drive_id(url: str) -> Optional[Dict[str, str]]:
+    """Google Drive URLからファイルID/フォルダIDを抽出"""
+    # ファイルURLのパターン
+    file_patterns = [
         r"drive\.google\.com/file/d/([a-zA-Z0-9_-]+)",
         r"drive\.google\.com/open\?id=([a-zA-Z0-9_-]+)",
     ]
     
-    for pattern in patterns:
+    # フォルダURLのパターン
+    folder_patterns = [
+        r"drive\.google\.com/drive/(?:u/\d+/)?folders/([a-zA-Z0-9_-]+)",
+    ]
+    
+    # ファイルIDを検索
+    for pattern in file_patterns:
         match = re.search(pattern, url)
         if match:
-            return match.group(1)
+            return {"type": "file", "id": match.group(1)}
+    
+    # フォルダIDを検索
+    for pattern in folder_patterns:
+        match = re.search(pattern, url)
+        if match:
+            return {"type": "folder", "id": match.group(1)}
+    
     return None
+
+
+def list_videos_in_folder(folder_id: str, service) -> List[Dict[str, str]]:
+    """フォルダ内の動画ファイル一覧を取得"""
+    try:
+        video_extensions = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv']
+        query = f"'{folder_id}' in parents and trashed=false"
+        
+        results = service.files().list(
+            q=query,
+            fields="files(id, name, mimeType, size)",
+            pageSize=100
+        ).execute()
+        
+        files = results.get('files', [])
+        
+        # 動画ファイルのみをフィルタ
+        video_files = []
+        for file in files:
+            name = file.get('name', '')
+            ext = name.split('.')[-1].lower() if '.' in name else ''
+            mime = file.get('mimeType', '')
+            
+            if ext in video_extensions or 'video' in mime:
+                video_files.append({
+                    'id': file['id'],
+                    'name': name,
+                    'size': file.get('size', 0)
+                })
+        
+        return video_files
+    except Exception as e:
+        st.error(f"フォルダ内のファイル取得に失敗しました: {e}")
+        return []
 
 
 def download_from_google_drive(file_id: str, output_path: str) -> bool:
@@ -392,16 +440,64 @@ def main():
         )
         
         if video_source == "Google Drive URL":
-            gdrive_url = st.text_input("Google Drive URL")
-            if st.button("ダウンロード"):
-                file_id = extract_google_drive_id(gdrive_url)
-                if file_id:
+            gdrive_url = st.text_input("Google Drive URL (ファイルまたはフォルダ)")
+            
+            if st.button("URLを解析"):
+                result = extract_google_drive_id(gdrive_url)
+                if result:
+                    if result['type'] == 'file':
+                        # ファイルの場合は直接ダウンロード
+                        st.session_state.gdrive_result = result
+                        st.session_state.gdrive_selected_file = result['id']
+                        st.info("✅ ファイルURLを検出しました。「ダウンロード」ボタンをクリックしてください。")
+                    elif result['type'] == 'folder':
+                        # フォルダの場合は動画一覧を取得
+                        st.session_state.gdrive_result = result
+                        with st.spinner("フォルダ内の動画を検索中..."):
+                            try:
+                                if "gcp_service_account" not in st.secrets:
+                                    st.error("Google Cloud認証情報が設定されていません。")
+                                else:
+                                    credentials_dict = dict(st.secrets["gcp_service_account"])
+                                    credentials = service_account.Credentials.from_service_account_info(
+                                        credentials_dict,
+                                        scopes=['https://www.googleapis.com/auth/drive.readonly']
+                                    )
+                                    service = build('drive', 'v3', credentials=credentials)
+                                    videos = list_videos_in_folder(result['id'], service)
+                                    
+                                    if videos:
+                                        st.session_state.gdrive_folder_videos = videos
+                                        st.success(f"✅ {len(videos)}件の動画ファイルが見つかりました。")
+                                    else:
+                                        st.warning("フォルダ内に動画ファイルが見つかりませんでした。")
+                            except Exception as e:
+                                st.error(f"フォルダの読み込みに失敗しました: {e}")
+                else:
+                    st.error("無効なGoogle Drive URLです。ファイルまたはフォルダのURLを入力してください。")
+            
+            # フォルダから動画を選択
+            if 'gdrive_folder_videos' in st.session_state and st.session_state.gdrive_folder_videos:
+                st.subheader("📂 フォルダ内の動画を選択")
+                video_names = [f"{v['name']} ({int(v['size'])//1024//1024}MB)" if v['size'] else v['name'] 
+                              for v in st.session_state.gdrive_folder_videos]
+                selected_idx = st.selectbox("動画を選択", range(len(video_names)), 
+                                           format_func=lambda i: video_names[i])
+                st.session_state.gdrive_selected_file = st.session_state.gdrive_folder_videos[selected_idx]['id']
+            
+            # ダウンロード実行
+            if 'gdrive_selected_file' in st.session_state:
+                if st.button("ダウンロード"):
+                    file_id = st.session_state.gdrive_selected_file
                     output_path = str(TEMP_VIDEOS_DIR / f"video_{file_id}.mp4")
                     if download_from_google_drive(file_id, output_path):
                         st.session_state.video_path = output_path
                         st.success("✅ ダウンロード完了!")
-                else:
-                    st.error("無効なGoogle Drive URLです。")
+                        # セッション状態をクリア
+                        if 'gdrive_folder_videos' in st.session_state:
+                            del st.session_state.gdrive_folder_videos
+                        if 'gdrive_selected_file' in st.session_state:
+                            del st.session_state.gdrive_selected_file
         
         elif video_source == "Web URL（YouTube等）":
             web_url = st.text_input("動画URL")
