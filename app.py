@@ -700,6 +700,23 @@ def get_background_settings(background_type: str):
     if background_type == "custom":
         # カスタム背景画像モード
         return {'mode': 'custom', 'balloon_image': None, 'box': 0, 'boxcolor': "black@0.0", 'boxborderw': 0}
+    elif background_type.startswith("カスタム（"):
+        # カスタム色の背景
+        # 例: "カスタム（#FF5733）半透明" or "カスタム（#FF5733）不透明"
+        import re
+        color_match = re.search(r'#[0-9A-Fa-f]{6}', background_type)
+        if color_match:
+            color_hex = color_match.group()
+            opacity = 0.7 if "半透明" in background_type else 1.0
+            return {
+                'mode': 'simple',
+                'balloon_image': None,
+                'box': 1,
+                'boxcolor': f"{color_hex}@{opacity}",
+                'boxborderw': 5
+            }
+        else:
+            return {'mode': 'simple', 'balloon_image': None, 'box': 0, 'boxcolor': "black@0.0", 'boxborderw': 0}
     elif background_type in simple_backgrounds:
         return simple_backgrounds[background_type]
     elif background_type in balloon_backgrounds:
@@ -1499,22 +1516,27 @@ def main():
                     # 文字色
                     font_color = st.color_picker("文字色", "#FFFFFF", key="font_color_picker")
                     
-                    # 自動調整オプション
-                    st.subheader("⚙️ 自動調整オプション")
-                    
-                    auto_position = st.checkbox(
-                        "🎯 テキストの表示位置を背景の位置に合わせる",
-                        value=True,
-                        key="auto_position_checkbox",
-                        help="吹き出し背景を使用する場合、テキストを吹き出しの中央に配置します"
-                    )
-                    
-                    auto_size = st.checkbox(
-                        "📊 テキストサイズを背景のサイズに合わせて自動調整",
-                        value=False,
-                        key="auto_size_checkbox",
-                        help="吹き出し背景のサイズに応じてフォントサイズを自動調整します（吹き出し幅60-70%のサイズ）"
-                    )
+                    # 自動調整オプション（吹き出し背景の場合のみ表示）
+                    if background_category == "吹き出し風":
+                        st.subheader("⚙️ 自動調整オプション")
+                        
+                        auto_position = st.checkbox(
+                            "🎯 テキストの表示位置を吹き出しの中央に合わせる",
+                            value=False,
+                            key="auto_position_checkbox",
+                            help="有効にすると、テキストを吹き出しの中央に自動配置します（手動位置指定より優先されます）"
+                        )
+                        
+                        auto_size = st.checkbox(
+                            "📊 テキストサイズを背景のサイズに合わせて自動調整",
+                            value=False,
+                            key="auto_size_checkbox",
+                            help="吹き出し背景のサイズに応じてフォントサイズを自動調整します（吹き出し幅60-70%のサイズ）"
+                        )
+                    else:
+                        # 吹き出し背景以外ではauto_positionを無効化
+                        auto_position = False
+                        auto_size = False
                     
                     st.markdown("---")
                     
@@ -1527,21 +1549,58 @@ def main():
                     )
                     
                     if background_category == "シンプル":
-                        background_type = st.selectbox(
-                            "背景タイプ",
-                            [
-                                "なし（透明）",
-                                "黒（半透明）",
-                                "白（半透明）",
-                                "黒（不透明）",
-                                "白（不透明）",
-                                "黄色（半透明）",
-                                "青（半透明）",
-                                "赤（半透明）",
-                                "緑（半透明）"
-                            ],
-                            key="background_select_simple"
+                        # 背景の有無を選択
+                        use_background = st.radio(
+                            "背景を使用",
+                            ["なし（透明）", "あり"],
+                            key="use_simple_background",
+                            horizontal=True
                         )
+                        
+                        if use_background == "あり":
+                            # 色選択
+                            bg_color_choice = st.radio(
+                                "背景色",
+                                ["⚪ 白", "⚫ 黒", "🎨 カスタム"],
+                                key="simple_bg_color_choice",
+                                horizontal=True
+                            )
+                            
+                            if bg_color_choice == "🎨 カスタム":
+                                # カラーピッカー
+                                custom_bg_color = st.color_picker(
+                                    "背景色を選択",
+                                    "#FFFF00",
+                                    key="custom_simple_bg_color"
+                                )
+                                st.session_state.simple_bg_custom_color = custom_bg_color
+                            
+                            # 透明度選択
+                            bg_opacity = st.radio(
+                                "透明度",
+                                ["半透明", "不透明"],
+                                key="simple_bg_opacity",
+                                horizontal=True
+                            )
+                            
+                            # background_typeを構築
+                            if bg_color_choice == "⚪ 白":
+                                if bg_opacity == "半透明":
+                                    background_type = "白（半透明）"
+                                else:
+                                    background_type = "白（不透明）"
+                            elif bg_color_choice == "⚫ 黒":
+                                if bg_opacity == "半透明":
+                                    background_type = "黒（半透明）"
+                                else:
+                                    background_type = "黒（不透明）"
+                            else:  # カスタム
+                                if bg_opacity == "半透明":
+                                    background_type = f"カスタム（{custom_bg_color}）半透明"
+                                else:
+                                    background_type = f"カスタム（{custom_bg_color}）不透明"
+                        else:
+                            background_type = "なし（透明）"
                     elif background_category == "吹き出し風":
                         background_type = st.selectbox(
                             "吹き出しデザイン",
@@ -1858,8 +1917,8 @@ def main():
                                     background_type,
                                     x_pos,
                                     y_pos,
-                                    auto_position=st.session_state.get('auto_position_checkbox', True),
-                                    auto_size=st.session_state.get('auto_size_checkbox', False)
+                                    auto_position=auto_position,
+                                    auto_size=auto_size
                                 )
                                 if success:
                                     st.session_state.preview_with_subtitle_path = preview_with_subtitle_path
@@ -1938,8 +1997,8 @@ def main():
                                 background_type,
                                 x_pos,
                                 y_pos,
-                                auto_position=st.session_state.get('auto_position_checkbox', True),
-                                auto_size=st.session_state.get('auto_size_checkbox', False)
+                                auto_position=auto_position,
+                                auto_size=auto_size
                             )
                             
                             if success:
