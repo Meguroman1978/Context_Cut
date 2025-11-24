@@ -976,7 +976,7 @@ def main():
             # シーン選択時のメッセージ表示
             if st.session_state.get('scene_selected', False):
                 st.success(f"✅ シーンを選択しました！開始: {st.session_state.selected_start:.2f}秒、終了: {st.session_state.selected_end:.2f}秒")
-                st.info("💡 スライダーまたは数値入力で範囲を調整できます。調整が終わったら「プレビューを生成」をクリックしてください。")
+                st.info("💡 下記の数値とスライダーに選択した時間が自動入力されています。必要に応じて調整してください。")
                 # メッセージを一度だけ表示
                 st.session_state.scene_selected = False
             
@@ -1356,6 +1356,21 @@ def main():
     # シーンプレビューのダイアログ（ポップアップ）
     @st.dialog("🎬 シーンプレビュー & 範囲調整", width="large")
     def show_scene_preview_dialog():
+        # CSSでダイアログサイズを1/4に縮小
+        st.markdown("""
+            <style>
+            [data-testid="stDialog"] {
+                max-width: 450px !important;
+            }
+            [data-testid="stDialog"] video {
+                max-width: 100% !important;
+                width: 300px !important;
+                margin: 0 auto;
+                display: block;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
         if 'current_scene_preview_path' in st.session_state:
             st.write(f"**シーン {st.session_state.preview_scene_id}**")
             
@@ -1435,6 +1450,13 @@ def main():
                     st.session_state.selected_end = st.session_state.dialog_adjusted_end
                     st.session_state.scene_preview_dialog_open = False
                     st.session_state.scene_selected = True
+                    # ウィジェットの値をクリアして新しい値を反映させる
+                    if 'cut_start_input' in st.session_state:
+                        del st.session_state.cut_start_input
+                    if 'cut_end_input' in st.session_state:
+                        del st.session_state.cut_end_input
+                    if 'cut_range_slider' in st.session_state:
+                        del st.session_state.cut_range_slider
                     # 調整値をリセット
                     if 'dialog_adjusted_start' in st.session_state:
                         del st.session_state.dialog_adjusted_start
