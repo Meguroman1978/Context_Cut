@@ -561,7 +561,6 @@ def generate_final_video_with_subtitle(
             balloon_stream = ffmpeg.input(balloon_path)
             
             # 吹き出し画像を動画に重ねる（固定位置: 下部中央）
-            # overlayは固定座標が必要なので、動画幅の中央、下から80pxの位置に配置
             video_stream = video_stream.overlay(
                 balloon_stream,
                 x='(main_w-overlay_w)/2',  # 中央配置
@@ -569,15 +568,16 @@ def generate_final_video_with_subtitle(
                 format='auto'
             )
             
-            # テキストを吹き出しの上に描画（位置は元のx_position, y_positionを使用）
+            # テキストを吹き出しの中央に強制配置
+            # 吹き出しの中心にテキストを配置（動画の中央、下部から約200px）
             video_stream = video_stream.filter(
                 'drawtext',
                 text=escaped_text,
                 fontfile=font_path,
                 fontsize=font_size,
                 fontcolor=font_color,
-                x=x_position,
-                y=y_position
+                x='(w-text_w)/2',         # テキストを水平方向の中央に
+                y='h-200'                 # 吹き出しの中央付近（下から200px）
             )
         # シンプル背景モード
         else:
@@ -1015,22 +1015,33 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
             
+            # スライダーの範囲を選択範囲の前後30秒に限定（より直感的に）
+            slider_min = max(0.0, initial_start - 30.0)
+            slider_max = min(st.session_state.video_duration, initial_end + 30.0)
+            
+            # スライダーの上にラベルを追加
+            st.markdown(f"""
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; color: #666;">
+                    <span>🔻 範囲: <strong>{slider_min:.2f}秒</strong></span>
+                    <span>🔺 範囲: <strong>{slider_max:.2f}秒</strong></span>
+                </div>
+            """, unsafe_allow_html=True)
+            
             # スライダーのデフォルト値を設定
             time_range = st.slider(
                 "開始・終了時間を調整（スライダーを動かして微調整）",
-                min_value=0.0,
-                max_value=st.session_state.video_duration,
+                min_value=slider_min,
+                max_value=slider_max,
                 value=(initial_start, initial_end),
                 step=0.1,
-                key="cut_range_slider",
-                format="%.2f秒"
+                key="cut_range_slider"
             )
             
             start_time, end_time = time_range
             
             # スライダー調整後の値を表示
             if (start_time != initial_start) or (end_time != initial_end):
-                st.warning(f"⚠️ スライダーを調整しました: {start_time:.2f}秒 〜 {end_time:.2f}秒")
+                st.warning(f"⚠️ スライダーを調整しましぞ: {start_time:.2f}秒 〜 {end_time:.2f}秒")
             
             # 選択範囲を表示
             col1, col2, col3 = st.columns(3)
