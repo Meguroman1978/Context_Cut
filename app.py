@@ -470,62 +470,46 @@ def create_preview_clip(video_path: str, start_time: float, end_time: float, out
         return False
 
 
-def get_background_settings(background_type: str) -> Tuple[int, str, int]:
+def get_background_settings(background_type: str):
     """背景タイプから設定を取得
     
     Returns:
-        (box, boxcolor, boxborderw)
+        dict: 'mode' (simple/balloon), 'balloon_image' (画像パス or None), 'box', 'boxcolor', 'boxborderw'
     """
     # シンプル背景
     simple_backgrounds = {
-        "なし（透明）": (0, "black@0.0", 0),
-        "黒（半透明）": (1, "black@0.5", 5),
-        "白（半透明）": (1, "white@0.8", 5),
-        "黒（不透明）": (1, "black@1.0", 5),
-        "白（不透明）": (1, "white@1.0", 5),
-        "黄色（半透明）": (1, "yellow@0.7", 5),
-        "青（半透明）": (1, "blue@0.7", 5),
-        "赤（半透明）": (1, "red@0.7", 5),
-        "緑（半透明）": (1, "green@0.7", 5),
+        "なし（透明）": {'mode': 'simple', 'balloon_image': None, 'box': 0, 'boxcolor': "black@0.0", 'boxborderw': 0},
+        "黒（半透明）": {'mode': 'simple', 'balloon_image': None, 'box': 1, 'boxcolor': "black@0.5", 'boxborderw': 5},
+        "白（半透明）": {'mode': 'simple', 'balloon_image': None, 'box': 1, 'boxcolor': "white@0.8", 'boxborderw': 5},
+        "黒（不透明）": {'mode': 'simple', 'balloon_image': None, 'box': 1, 'boxcolor': "black@1.0", 'boxborderw': 5},
+        "白（不透明）": {'mode': 'simple', 'balloon_image': None, 'box': 1, 'boxcolor': "white@1.0", 'boxborderw': 5},
+        "黄色（半透明）": {'mode': 'simple', 'balloon_image': None, 'box': 1, 'boxcolor': "yellow@0.7", 'boxborderw': 5},
+        "青（半透明）": {'mode': 'simple', 'balloon_image': None, 'box': 1, 'boxcolor': "blue@0.7", 'boxborderw': 5},
+        "赤（半透明）": {'mode': 'simple', 'balloon_image': None, 'box': 1, 'boxcolor': "red@0.7", 'boxborderw': 5},
+        "緑（半透明）": {'mode': 'simple', 'balloon_image': None, 'box': 1, 'boxcolor': "green@0.7", 'boxborderw': 5},
     }
     
-    # 吹き出し風背景（角丸の大きさと色で差別化）
+    # 吹き出し画像背景
     balloon_backgrounds = {
-        # 楕円系 - 大きめの角丸で楕円感を出す
-        "💬 楕円吹き出し（白）": (1, "white@0.98", 25),
-        "💬 楕円吹き出し（黒）": (1, "black@0.90", 25),
-        
-        # 風船系 - 最大の角丸でふんわり感
-        "🎈 風船吹き出し（白）": (1, "white@0.98", 35),
-        "🎈 風船吹き出し（黒）": (1, "black@0.90", 35),
-        
-        # 角丸長方形 - 標準的な角丸
-        "🗨️ 角丸長方形（白）": (1, "white@0.98", 15),
-        "🗨️ 角丸長方形（黒）": (1, "black@0.90", 15),
-        
-        # 角張り - 最小の角丸
-        "⬛ 角張り長方形（白）": (1, "white@0.98", 3),
-        "⬛ 角張り長方形（黒）": (1, "black@0.90", 3),
-        
-        # ダイア形 - 中程度の角丸
-        "💍 ダイア形（白）": (1, "white@0.98", 18),
-        "💍 ダイア形（黒）": (1, "black@0.90", 18),
-        
-        # 六角形 - やや大きめの角丸
-        "⬣ 六角形（白）": (1, "white@0.98", 22),
-        "⬣ 六角形（黒）": (1, "black@0.90", 22),
-        
-        # 雲形 - 大きめの角丸でふわふわ感
-        "☁️ 雲形（白）": (1, "white@0.98", 30),
-        "☁️ 雲形（黒）": (1, "black@0.90", 30),
-        
-        # 爆発形 - 非常に大きな角丸でインパクト
-        "💥 爆発形（白）": (1, "yellow@0.95", 40),  # 黄色で爆発感
-        "💥 爆発形（黒）": (1, "red@0.85", 40),     # 赤で爆発感
-        
-        # 放射線 - 最大の角丸
-        "⭐ 放射線（白）": (1, "yellow@0.95", 45),  # 黄色で放射感
-        "⭐ 放射線（黒）": (1, "orange@0.85", 45),  # オレンジで放射感
+        "💬 楕円吹き出し（白）": {'mode': 'balloon', 'balloon_image': 'balloon_images/oval_white.png'},
+        "💬 楕円吹き出し（黒）": {'mode': 'balloon', 'balloon_image': 'balloon_images/oval_black.png'},
+        "🗨️ 角丸長方形（白）": {'mode': 'balloon', 'balloon_image': 'balloon_images/round_rect_white.png'},
+        "🗨️ 角丸長方形（黒）": {'mode': 'balloon', 'balloon_image': 'balloon_images/round_rect_black.png'},
+        "☁️ 雲形（白）": {'mode': 'balloon', 'balloon_image': 'balloon_images/cloud_white.png'},
+        "☁️ 雲形（黒）": {'mode': 'balloon', 'balloon_image': 'balloon_images/cloud_black.png'},
+        "⭐ 放射線（白）": {'mode': 'balloon', 'balloon_image': 'balloon_images/star_white.png'},
+        "⭐ 放射線（黒）": {'mode': 'balloon', 'balloon_image': 'balloon_images/star_black.png'},
+        "⬛ 角張り長方形（白）": {'mode': 'balloon', 'balloon_image': 'balloon_images/square_white.png'},
+        "⬛ 角張り長方形（黒）": {'mode': 'balloon', 'balloon_image': 'balloon_images/square_black.png'},
+        "💭 考え事（白）": {'mode': 'balloon', 'balloon_image': 'balloon_images/thought_white.png'},
+        "💭 考え事（黒）": {'mode': 'balloon', 'balloon_image': 'balloon_images/thought_black.png'},
+        "💢 叫び（白）": {'mode': 'balloon', 'balloon_image': 'balloon_images/scream_white.png'},
+        "💢 叫び（黒）": {'mode': 'balloon', 'balloon_image': 'balloon_images/scream_black.png'},
+        "💥 爆発（黄）": {'mode': 'balloon', 'balloon_image': 'balloon_images/explosion_yellow.png'},
+        "💥 爆発（赤）": {'mode': 'balloon', 'balloon_image': 'balloon_images/explosion_red.png'},
+        "💗 ハート（ピンク）": {'mode': 'balloon', 'balloon_image': 'balloon_images/heart_pink.png'},
+        "🗨️ 角丸長方形（青）": {'mode': 'balloon', 'balloon_image': 'balloon_images/round_rect_blue.png'},
+        "🗨️ 角丸長方形（緑）": {'mode': 'balloon', 'balloon_image': 'balloon_images/round_rect_green.png'},
     }
     
     # 該当する背景を検索
@@ -535,7 +519,7 @@ def get_background_settings(background_type: str) -> Tuple[int, str, int]:
         return balloon_backgrounds[background_type]
     else:
         # デフォルト
-        return (0, "black@0.0", 0)
+        return {'mode': 'simple', 'balloon_image': None, 'box': 0, 'boxcolor': "black@0.0", 'boxborderw': 0}
 
 
 def generate_final_video_with_subtitle(
@@ -551,40 +535,41 @@ def generate_final_video_with_subtitle(
     x_position: str = "(w-text_w)/2",
     y_position: str = "h-text_h-20"
 ) -> bool:
-    """テロップ付き最終動画を生成"""
+    """テロップ付き最終動画を生成（吹き出し画像対応）"""
     try:
         # フォントパスの取得（Windowsパスを/に変換）
         font_path = str(FONTS_DIR / font_file).replace("\\", "/")
         
         # テキストのエスケープ処理（FFmpegのdrawtextフィルタ用）
-        # シングルクォート、バックスラッシュ、コロン、改行をエスケープ
         escaped_text = subtitle_text.replace("\\", "\\\\\\\\")
         escaped_text = escaped_text.replace("'", "'\\\\''")  
         escaped_text = escaped_text.replace(":", "\\:")
         escaped_text = escaped_text.replace("\n", " ")
         
         # 背景設定を取得
-        box, boxcolor, boxborderw = get_background_settings(background_type)
+        bg_settings = get_background_settings(background_type)
         
         # FFmpegコマンドの実行
         input_stream = ffmpeg.input(video_path, ss=start_time, to=end_time)
+        video_stream = input_stream.video
         
-        # 映像ストリームにdrawtextフィルタを適用
-        if box > 0:
-            video_stream = input_stream.video.filter(
-                'drawtext',
-                text=escaped_text,
-                fontfile=font_path,
-                fontsize=font_size,
-                fontcolor=font_color,
+        # 吹き出し画像モードの場合
+        if bg_settings['mode'] == 'balloon' and bg_settings['balloon_image']:
+            balloon_path = str(Path(bg_settings['balloon_image']).absolute()).replace("\\", "/")
+            
+            # 吹き出し画像をオーバーレイ
+            balloon_stream = ffmpeg.input(balloon_path)
+            
+            # 吹き出し画像を動画に重ねる（位置調整）
+            video_stream = video_stream.overlay(
+                balloon_stream,
                 x=x_position,
                 y=y_position,
-                box=box,
-                boxcolor=boxcolor,
-                boxborderw=boxborderw
+                format='auto'
             )
-        else:
-            video_stream = input_stream.video.filter(
+            
+            # テキストを吹き出しの上に描画（boxなし）
+            video_stream = video_stream.filter(
                 'drawtext',
                 text=escaped_text,
                 fontfile=font_path,
@@ -593,6 +578,31 @@ def generate_final_video_with_subtitle(
                 x=x_position,
                 y=y_position
             )
+        # シンプル背景モード
+        else:
+            if bg_settings['box'] > 0:
+                video_stream = video_stream.filter(
+                    'drawtext',
+                    text=escaped_text,
+                    fontfile=font_path,
+                    fontsize=font_size,
+                    fontcolor=font_color,
+                    x=x_position,
+                    y=y_position,
+                    box=bg_settings['box'],
+                    boxcolor=bg_settings['boxcolor'],
+                    boxborderw=bg_settings['boxborderw']
+                )
+            else:
+                video_stream = video_stream.filter(
+                    'drawtext',
+                    text=escaped_text,
+                    fontfile=font_path,
+                    fontsize=font_size,
+                    fontcolor=font_color,
+                    x=x_position,
+                    y=y_position
+                )
         
         # 音声ストリームを取得（そのままコピー）
         audio_stream = input_stream.audio
@@ -976,7 +986,7 @@ def main():
             # シーン選択時のメッセージ表示
             if st.session_state.get('scene_selected', False):
                 st.success(f"✅ シーンを選択しました！開始: {st.session_state.selected_start:.2f}秒、終了: {st.session_state.selected_end:.2f}秒")
-                st.info("💡 下記の数値とスライダーに選択した時間が自動入力されています。必要に応じて調整してください。")
+                st.info("💡 スライダーに選択した時間が自動入力されています。必要に応じて調整してください。")
                 # メッセージを一度だけ表示
                 st.session_state.scene_selected = False
             
@@ -990,48 +1000,29 @@ def main():
             if initial_end <= initial_start:
                 initial_end = min(initial_start + 5.0, st.session_state.video_duration)
             
-            # Number Inputでの詳細設定（最初に表示）
-            st.subheader("📏 詳細設定")
-            col1, col2 = st.columns(2)
+            # スライダーでの範囲指定（詳細設定は削除）
+            st.subheader("🎯 スライダーで範囲を指定")
             
-            with col1:
-                start_time = st.number_input(
-                    "開始時間（秒）",
-                    min_value=0.0,
-                    max_value=st.session_state.video_duration,
-                    value=initial_start,
-                    step=0.1,
-                    key="cut_start_input",
-                    format="%.2f"
-                )
-            
-            with col2:
-                end_time = st.number_input(
-                    "終了時間（秒）",
-                    min_value=0.0,
-                    max_value=st.session_state.video_duration,
-                    value=initial_end,
-                    step=0.1,
-                    key="cut_end_input",
-                    format="%.2f"
-                )
-            
-            # スライダーでの微調整
-            st.subheader("🎯 スライダーで微調整")
+            # スライダーのデフォルト値を設定
             time_range = st.slider(
-                "範囲選択",
-                0.0,
-                st.session_state.video_duration,
-                (start_time, end_time),
+                "開始・終了時間を調整",
+                min_value=0.0,
+                max_value=st.session_state.video_duration,
+                value=(initial_start, initial_end),
                 step=0.1,
                 key="cut_range_slider"
             )
             
-            # スライダーが変更された場合はそれを優先
-            if time_range != (start_time, end_time):
-                start_time, end_time = time_range
+            start_time, end_time = time_range
             
-            st.write(f"📏 選択範囲: {end_time - start_time:.2f}秒")
+            # 選択範囲を表示
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("開始時間", f"{start_time:.2f}秒")
+            with col2:
+                st.metric("終了時間", f"{end_time:.2f}秒")
+            with col3:
+                st.metric("範囲", f"{end_time - start_time:.2f}秒")
             
             # 選択範囲を更新（次回のリロード時に反映）
             st.session_state.selected_start = start_time
@@ -1140,22 +1131,23 @@ def main():
                             [
                                 "💬 楕円吹き出し（白）",
                                 "💬 楕円吹き出し（黒）",
-                                "🎈 風船吹き出し（白）",
-                                "🎈 風船吹き出し（黒）",
                                 "🗨️ 角丸長方形（白）",
                                 "🗨️ 角丸長方形（黒）",
-                                "⬟ 角張り長方形（白）",
-                                "⬟ 角張り長方形（黒）",
-                                "💍 ダイヤ形（白）",
-                                "💍 ダイヤ形（黒）",
-                                "⬣ 六角形（白）",
-                                "⬣ 六角形（黒）",
                                 "☁️ 雲形（白）",
                                 "☁️ 雲形（黒）",
-                                "💥 爆発形（白）",
-                                "💥 爆発形（黒）",
                                 "⭐ 放射線（白）",
-                                "⭐ 放射線（黒）"
+                                "⭐ 放射線（黒）",
+                                "⬛ 角張り長方形（白）",
+                                "⬛ 角張り長方形（黒）",
+                                "💭 考え事（白）",
+                                "💭 考え事（黒）",
+                                "💢 叫び（白）",
+                                "💢 叫び（黒）",
+                                "💥 爆発（黄）",
+                                "💥 爆発（赤）",
+                                "💗 ハート（ピンク）",
+                                "🗨️ 角丸長方形（青）",
+                                "🗨️ 角丸長方形（緑）"
                             ],
                             key="background_select_balloon"
                         )
@@ -1450,11 +1442,7 @@ def main():
                     st.session_state.selected_end = st.session_state.dialog_adjusted_end
                     st.session_state.scene_preview_dialog_open = False
                     st.session_state.scene_selected = True
-                    # ウィジェットの値をクリアして新しい値を反映させる
-                    if 'cut_start_input' in st.session_state:
-                        del st.session_state.cut_start_input
-                    if 'cut_end_input' in st.session_state:
-                        del st.session_state.cut_end_input
+                    # スライダーの値をクリアして新しい値を反映させる
                     if 'cut_range_slider' in st.session_state:
                         del st.session_state.cut_range_slider
                     # 調整値をリセット
