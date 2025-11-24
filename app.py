@@ -390,54 +390,75 @@ def generate_final_video_with_subtitle(
 ) -> bool:
     """テロップ付き最終動画を生成"""
     try:
-        # フォントパスの取得
-        font_path = str(FONTS_DIR / font_file)
+        # フォントパスの取得（Windowsパスを/に変換）
+        font_path = str(FONTS_DIR / font_file).replace("\\", "/")
+        
+        # テキストのエスケープ処理（FFmpegのdrawtextフィルタ用）
+        # シングルクォート、バックスラッシュ、コロン、改行をエスケープ
+        escaped_text = subtitle_text.replace("\\", "\\\\\\\\")
+        escaped_text = escaped_text.replace("'", "'\\\\''")  
+        escaped_text = escaped_text.replace(":", "\\:")
+        escaped_text = escaped_text.replace("\n", " ")
         
         # 背景設定
-        box_settings = ""
+        box = 0
+        boxcolor = "black@0.0"
+        boxborderw = 0
+        
         if background_type == "黒（半透明）":
-            box_settings = ":box=1:boxcolor=black@0.5:boxborderw=5"
+            box = 1
+            boxcolor = "black@0.5"
+            boxborderw = 5
         elif background_type == "白":
-            box_settings = ":box=1:boxcolor=white@0.8:boxborderw=5"
-        
-        # drawtext フィルタの構築
-        # テキストのエスケープ処理
-        escaped_text = subtitle_text.replace("'", r"'\''").replace(":", r"\:")
-        
-        drawtext_filter = (
-            f"drawtext=text='{escaped_text}':"
-            f"fontfile={font_path}:"
-            f"fontsize={font_size}:"
-            f"fontcolor={font_color}:"
-            f"x={x_position}:"
-            f"y={y_position}"
-            f"{box_settings}"
-        )
+            box = 1
+            boxcolor = "white@0.8"
+            boxborderw = 5
         
         # FFmpegコマンドの実行
-        (
-            ffmpeg
-            .input(video_path, ss=start_time, to=end_time)
-            .filter('drawtext', 
-                   text=subtitle_text,
-                   fontfile=font_path,
-                   fontsize=font_size,
-                   fontcolor=font_color,
-                   x=x_position,
-                   y=y_position,
-                   box=1 if background_type != "なし（透明）" else 0,
-                   boxcolor='black@0.5' if background_type == "黒（半透明）" else 'white@0.8' if background_type == "白" else '',
-                   boxborderw=5 if background_type != "なし（透明）" else 0
+        input_stream = ffmpeg.input(video_path, ss=start_time, to=end_time)
+        
+        # drawtextフィルタを適用
+        if box > 0:
+            video = input_stream.filter(
+                'drawtext',
+                text=escaped_text,
+                fontfile=font_path,
+                fontsize=font_size,
+                fontcolor=font_color,
+                x=x_position,
+                y=y_position,
+                box=box,
+                boxcolor=boxcolor,
+                boxborderw=boxborderw
             )
-            .output(output_path, 
-                   vcodec='libx264',
-                   acodec='aac',
-                   loglevel='error')
-            .overwrite_output()
-            .run()
+        else:
+            video = input_stream.filter(
+                'drawtext',
+                text=escaped_text,
+                fontfile=font_path,
+                fontsize=font_size,
+                fontcolor=font_color,
+                x=x_position,
+                y=y_position
+            )
+        
+        # 出力
+        output = ffmpeg.output(
+            video,
+            output_path,
+            vcodec='libx264',
+            acodec='aac',
+            **{'loglevel': 'warning', 'y': None}
         )
         
+        ffmpeg.run(output, overwrite_output=True, capture_stderr=True)
+        
         return True
+    except ffmpeg.Error as e:
+        st.error(f"最終動画の生成に失敗しました: FFmpegエラー")
+        stderr_output = e.stderr.decode('utf-8') if e.stderr else "詳細なし"
+        st.error(f"詳細: {stderr_output}")
+        return False
     except Exception as e:
         st.error(f"最終動画の生成に失敗しました: {e}")
         st.error(f"詳細: {str(e)}")
@@ -469,6 +490,16 @@ def main():
         st.session_state.video_duration = 0
     if 'chromadb_client' not in st.session_state:
         st.session_state.chromadb_client = setup_chromadb()
+    if 'selected_start' not in st.session_state:
+        st.session_state.selected_start = 0.0
+    if 'selected_end' not in st.session_state:
+        st.session_state.selected_end = 10.0
+    if 'show_scene_preview' not in st.session_state:
+        st.session_state.show_scene_preview = False
+    if 'preview_scene_start' not in st.session_state:
+        st.session_state.preview_scene_start = 0.0
+    if 'preview_scene_end' not in st.session_state:
+        st.session_state.preview_scene_end = 0.0
     
     # サイドバー: 動画取得
     with st.sidebar:
@@ -704,11 +735,42 @@ def main():
                                 st.write(f"**開始:** {scene['start']:.2f}秒")
                                 st.write(f"**終了:** {scene['end']:.2f}秒")
                                 
-                                # シーンを選択ボタン
-                                if st.button(f"このシーンを選択", key=f"select_{i}"):
-                                    st.session_state.selected_start = scene['start']
-                                    st.session_state.selected_end = scene['end']
-                                    st.success("✅ シーンを選択しました！「カット範囲指定」タブで調整できます。")
+                                # ボタンを横並びに配置
+                                col_btn1, col_btn2 = st.columns(2)
+                                
+                                with col_btn1:
+                                    # シーンプレビューボタン
+                                    if st.button(f"このシーンをプレビュー", key=f"preview_{i}"):
+                                        st.session_state.show_scene_preview = True
+                                        st.session_state.preview_scene_start = scene['start']
+                                        st.session_state.preview_scene_end = scene['end']
+                                        st.session_state.preview_scene_id = i
+                                
+                                with col_btn2:
+                                    # シーンを選択ボタン
+                                    if st.button(f"このシーンを選択", key=f"select_{i}"):
+                                        st.session_state.selected_start = scene['start']
+                                        st.session_state.selected_end = scene['end']
+                                        st.success("✅ シーンを選択しました！「カット範囲指定」タブで調整できます。")
+                        
+                        # シーンプレビューのポップアップ表示
+                        if st.session_state.show_scene_preview:
+                            st.divider()
+                            st.subheader(f"🎬 シーン {st.session_state.get('preview_scene_id', '')} のプレビュー")
+                            
+                            with st.spinner("プレビューを生成中..."):
+                                preview_path = str(TEMP_VIDEOS_DIR / f"scene_preview_{st.session_state.preview_scene_id}.mp4")
+                                if create_preview_clip(
+                                    st.session_state.video_path,
+                                    st.session_state.preview_scene_start,
+                                    st.session_state.preview_scene_end,
+                                    preview_path
+                                ):
+                                    st.video(preview_path)
+                            
+                            if st.button("✖️ プレビューを閉じる"):
+                                st.session_state.show_scene_preview = False
+                                st.rerun()
                     else:
                         st.warning("検索結果が見つかりませんでした。")
         
@@ -723,8 +785,9 @@ def main():
                     "開始時間（秒）",
                     min_value=0.0,
                     max_value=st.session_state.video_duration,
-                    value=st.session_state.get('selected_start', 0.0),
-                    step=0.1
+                    value=float(st.session_state.selected_start),
+                    step=0.1,
+                    key="cut_start_input"
                 )
             
             with col2:
@@ -732,8 +795,9 @@ def main():
                     "終了時間（秒）",
                     min_value=0.0,
                     max_value=st.session_state.video_duration,
-                    value=st.session_state.get('selected_end', min(10.0, st.session_state.video_duration)),
-                    step=0.1
+                    value=float(st.session_state.selected_end if st.session_state.selected_end <= st.session_state.video_duration else min(10.0, st.session_state.video_duration)),
+                    step=0.1,
+                    key="cut_end_input"
                 )
             
             st.write(f"選択範囲: {end_time - start_time:.2f}秒")
@@ -744,18 +808,28 @@ def main():
                 "範囲選択",
                 0.0,
                 st.session_state.video_duration,
-                (start_time, end_time),
-                step=0.1
+                (float(st.session_state.selected_start), float(st.session_state.selected_end if st.session_state.selected_end <= st.session_state.video_duration else min(10.0, st.session_state.video_duration))),
+                step=0.1,
+                key="cut_range_slider"
             )
             
             start_time, end_time = time_range
+            
+            # 選択範囲を更新
+            st.session_state.selected_start = start_time
+            st.session_state.selected_end = end_time
             
             # プレビュー生成
             if st.button("プレビューを生成"):
                 preview_path = str(TEMP_VIDEOS_DIR / "preview.mp4")
                 if create_preview_clip(st.session_state.video_path, start_time, end_time, preview_path):
                     st.success("✅ プレビュー生成完了!")
-                    st.video(preview_path)
+                    # 動画サイズを1/6に縮小して表示（width=300px程度）
+                    st.video(preview_path, format="video/mp4", start_time=0)
+                    st.markdown(
+                        '<style>div[data-testid="stVideo"] video { max-width: 300px !important; }</style>',
+                        unsafe_allow_html=True
+                    )
                     st.session_state.preview_path = preview_path
                     st.session_state.clip_start = start_time
                     st.session_state.clip_end = end_time
@@ -767,48 +841,53 @@ def main():
             if 'clip_start' not in st.session_state:
                 st.warning("まず「カット範囲指定」タブでプレビューを生成してください。")
             else:
-                # テキスト入力
-                subtitle_text = st.text_area(
-                    "テロップテキスト",
-                    placeholder="ここにテロップを入力してください",
-                    height=100
-                )
+                # 2カラムレイアウト: 左側にプレビュー、右側に設定
+                col_preview, col_settings = st.columns([1, 1])
                 
-                # スタイル設定
-                st.subheader("📐 スタイル設定")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
+                with col_settings:
+                    # テキスト入力
+                    subtitle_text = st.text_area(
+                        "テロップテキスト",
+                        placeholder="ここにテロップを入力してください",
+                        height=100,
+                        key="subtitle_text_input"
+                    )
+                    
+                    # スタイル設定
+                    st.subheader("📐 スタイル設定")
+                    
                     # フォント選択
                     available_fonts = get_available_fonts()
                     
                     if not available_fonts:
                         st.error("利用可能なフォントがありません。")
+                        selected_font = None
                     else:
                         selected_font = st.selectbox(
                             "フォント選択",
                             available_fonts,
-                            index=0
+                            index=0,
+                            key="font_select"
                         )
                     
                     # フォントサイズ
-                    font_size = st.slider("フォントサイズ", 24, 120, 48)
+                    font_size = st.slider("フォントサイズ", 24, 120, 48, key="font_size_slider")
                     
                     # 文字色
-                    font_color = st.color_picker("文字色", "#FFFFFF")
-                
-                with col2:
+                    font_color = st.color_picker("文字色", "#FFFFFF", key="font_color_picker")
+                    
                     # 背景色
                     background_type = st.selectbox(
                         "背景",
-                        ["なし（透明）", "黒（半透明）", "白"]
+                        ["なし（透明）", "黒（半透明）", "白"],
+                        key="background_select"
                     )
                     
                     # 位置設定（簡易版）
                     position_preset = st.selectbox(
                         "テロップ位置",
-                        ["下部中央", "上部中央", "中央"]
+                        ["下部中央", "上部中央", "中央"],
+                        key="position_select"
                     )
                     
                     position_map = {
@@ -817,6 +896,44 @@ def main():
                         "中央": ("(w-text_w)/2", "(h-text_h)/2")
                     }
                     x_pos, y_pos = position_map[position_preset]
+                    
+                    # リアルタイムプレビュー生成ボタン
+                    if st.button("🔄 プレビューを更新", key="update_preview"):
+                        if subtitle_text and selected_font:
+                            with st.spinner("プレビューを生成中..."):
+                                preview_with_subtitle_path = str(TEMP_VIDEOS_DIR / "preview_with_subtitle.mp4")
+                                success = generate_final_video_with_subtitle(
+                                    st.session_state.video_path,
+                                    st.session_state.clip_start,
+                                    st.session_state.clip_end,
+                                    preview_with_subtitle_path,
+                                    subtitle_text,
+                                    selected_font,
+                                    font_size,
+                                    font_color,
+                                    background_type,
+                                    x_pos,
+                                    y_pos
+                                )
+                                if success:
+                                    st.session_state.preview_with_subtitle_path = preview_with_subtitle_path
+                                    st.success("✅ プレビュー更新完了！")
+                        else:
+                            st.warning("テロップテキストを入力してください。")
+                
+                with col_preview:
+                    # リアルタイムプレビュー表示
+                    st.subheader("🎬 プレビュー")
+                    if 'preview_with_subtitle_path' in st.session_state:
+                        st.video(st.session_state.preview_with_subtitle_path)
+                        st.info("💡 左側の設定を変更したら「プレビューを更新」をクリックしてください")
+                    else:
+                        # 元のプレビュー動画を表示（テロップなし）
+                        if 'preview_path' in st.session_state:
+                            st.video(st.session_state.preview_path)
+                            st.info("💡 テロップを入力して「プレビューを更新」をクリックすると、テロップ付きプレビューが表示されます")
+                        else:
+                            st.info("💡 まず「カット範囲指定」タブでプレビューを生成してください")
                 
                 # フォントアップロード
                 st.subheader("➕ 新しいフォントを追加")
@@ -833,11 +950,14 @@ def main():
                             st.rerun()
                 
                 # 動画生成
+                st.divider()
                 st.subheader("🎬 最終動画生成")
                 
                 if st.button("🎬 テロップ付き動画を生成", type="primary"):
                     if not subtitle_text:
                         st.warning("テロップテキストを入力してください。")
+                    elif not selected_font:
+                        st.warning("フォントを選択してください。")
                     else:
                         with st.spinner("動画を生成中... (数分かかる場合があります)"):
                             output_path = str(TEMP_VIDEOS_DIR / "final_output.mp4")
