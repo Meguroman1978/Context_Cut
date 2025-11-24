@@ -242,9 +242,12 @@ def download_from_web(url: str, output_path: str) -> bool:
 def load_whisper_model(model_name: str = "base"):
     """Whisperモデルをロード（キャッシュ付き）"""
     try:
-        return whisper.load_model(model_name)
+        st.info(f"🔄 Whisperモデル（{model_name}）をロード中... 初回は数分かかります。")
+        model = whisper.load_model(model_name)
+        st.success(f"✅ Whisperモデル（{model_name}）のロードが完了しました！")
+        return model
     except Exception as e:
-        st.error(f"Whisperモデルのロードに失敗しました: {e}")
+        st.error(f"❌ Whisperモデルのロードに失敗しました: {e}")
         return None
 
 
@@ -285,7 +288,14 @@ def transcribe_video(video_path: str, model) -> Optional[Dict]:
             st.info("💡 音声付きの動画を使用するか、音声なしで動画編集を行ってください。")
             return None
         
-        st.info(f"🎤 動画を文字起こし中... （動画の長さ: {duration:.1f}秒、数分かかる場合があります）")
+        # 処理時間の目安を表示
+        if duration > 600:  # 10分以上
+            st.warning(f"⚠️ 動画が長いです（{duration/60:.1f}分）。処理に10分以上かかる可能性があります。")
+            st.info("💡 **推奨**: 動画を短く切り取るか、tinyモデルを使用してください。")
+        elif duration > 300:  # 5分以上
+            st.info(f"🎤 動画を文字起こし中... （動画の長さ: {duration/60:.1f}分、5-10分程度かかります）")
+        else:
+            st.info(f"🎤 動画を文字起こし中... （動画の長さ: {duration:.1f}秒、1-3分程度かかります）")
         
         # 一時的な音声ファイルを作成（Whisperが処理しやすい形式に変換）
         import tempfile
@@ -294,7 +304,13 @@ def transcribe_video(video_path: str, model) -> Optional[Dict]:
         
         try:
             # FFmpegで音声を抽出してWAV形式に変換
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
             try:
+                status_text.text("⏳ ステップ 1/3: FFmpegで音声を抽出中...")
+                progress_bar.progress(10)
+                
                 (
                     ffmpeg
                     .input(video_path)
@@ -308,7 +324,13 @@ def transcribe_video(video_path: str, model) -> Optional[Dict]:
                     .overwrite_output()
                     .run(capture_stdout=True, capture_stderr=True)
                 )
+                
+                progress_bar.progress(30)
+                status_text.text("✅ 音声抽出完了！")
+                
             except ffmpeg.Error as e:
+                progress_bar.empty()
+                status_text.empty()
                 stderr_output = e.stderr.decode('utf-8') if e.stderr else 'エラー情報なし'
                 st.error(f"❌ FFmpegでの音声抽出に失敗しました。")
                 st.error(f"**FFmpegエラー詳細**:\n```\n{stderr_output}\n```")
@@ -318,21 +340,52 @@ def transcribe_video(video_path: str, model) -> Optional[Dict]:
             
             # 音声ファイルのサイズチェック
             import os
+            status_text.text("⏳ ステップ 2/3: 音声ファイルを検証中...")
+            progress_bar.progress(40)
+            
             if not os.path.exists(tmp_audio_path):
+                progress_bar.empty()
+                status_text.empty()
                 st.error("❌ 音声ファイルが作成されませんでした。")
                 return None
             
             audio_size = os.path.getsize(tmp_audio_path)
-            st.info(f"🔍 デバッグ情報: 抽出された音声ファイルサイズ = {audio_size:,} bytes")
+            audio_size_mb = audio_size / (1024 * 1024)
+            st.info(f"🔍 抽出された音声: {audio_size:,} bytes ({audio_size_mb:.2f} MB)")
             
             if audio_size < 1000:  # 1KB未満
+                progress_bar.empty()
+                status_text.empty()
                 st.error("❌ 抽出された音声データが小さすぎます。音声が含まれていない可能性があります。")
                 st.info(f"💡 音声ファイルサイズ: {audio_size} bytes（最低1,000 bytes必要）")
                 os.unlink(tmp_audio_path)
                 return None
             
+            # 大きなファイルの警告
+            if audio_size_mb > 100:
+                progress_bar.empty()
+                status_text.empty()
+                st.error(f"❌ 音声ファイルが大きすぎます（{audio_size_mb:.1f} MB）。")
+                st.error("**Streamlit Community Cloudの制限により、100MB以上の音声は処理できません。**")
+                st.info("""
+                💡 **対処方法**:
+                1. 動画を短く切り取る（5分以内推奨）
+                2. より軽量なモデル（tiny）を使用する
+                3. 動画の音声ビットレートを下げる
+                """)
+                os.unlink(tmp_audio_path)
+                return None
+            elif audio_size_mb > 50:
+                st.warning(f"⚠️ 音声ファイルが大きいです（{audio_size_mb:.1f} MB）。処理に5-10分以上かかる可能性があります。")
+                st.info("💡 長い動画の場合は、tinyモデルの使用または事前に短く切り取ることをおすすめします。")
+            
             # Whisperで文字起こし実行
-            st.info("🤖 Whisperモデルで音声認識を実行中...")
+            progress_bar.progress(50)
+            status_text.text("⏳ ステップ 3/3: Whisperで音声認識中（これには数分かかります）...")
+            
+            import time
+            start_time = time.time()
+            
             try:
                 result = model.transcribe(
                     tmp_audio_path, 
@@ -342,8 +395,16 @@ def transcribe_video(video_path: str, model) -> Optional[Dict]:
                     temperature=0.0,  # より安定した結果を得る
                     condition_on_previous_text=False  # エラー回避
                 )
+                
+                elapsed_time = time.time() - start_time
+                progress_bar.progress(100)
+                status_text.text(f"✅ 音声認識完了！（処理時間: {elapsed_time:.1f}秒）")
+                
             except Exception as whisper_error:
-                st.error(f"❌ Whisperでの音声認識に失敗しました: {whisper_error}")
+                progress_bar.empty()
+                status_text.empty()
+                elapsed_time = time.time() - start_time
+                st.error(f"❌ Whisperでの音声認識に失敗しました（{elapsed_time:.1f}秒後）: {whisper_error}")
                 if os.path.exists(tmp_audio_path):
                     os.unlink(tmp_audio_path)
                 raise whisper_error
@@ -1000,10 +1061,28 @@ def main():
         if st.session_state.video_path:
             st.info("💡 シーン検索機能を使用する場合は文字起こしが必要です。\n文字起こしなしでも、カット範囲指定とテロップ編集は使用できます。")
             
+            # モデル選択オプション
+            st.write("**Whisperモデル選択**")
+            model_choice = st.radio(
+                "処理速度と精度のバランスを選択",
+                ["🚀 高速（tiny）- 推奨", "⚖️ バランス（base）", "🎯 高精度（small）"],
+                index=0,
+                horizontal=True,
+                help="tinyモデルは処理が高速ですが精度がやや低いです。長い動画や処理が重い場合はtinyを推奨します。"
+            )
+            
+            # モデル名を取得
+            if "高速" in model_choice:
+                model_name = "tiny"
+            elif "バランス" in model_choice:
+                model_name = "base"
+            else:
+                model_name = "small"
+            
             col_trans1, col_trans2 = st.columns(2)
             with col_trans1:
                 if st.button("🎤 文字起こしを実行", use_container_width=True):
-                    model = load_whisper_model("base")
+                    model = load_whisper_model(model_name)
                     if model:
                         transcription = transcribe_video(st.session_state.video_path, model)
                         if transcription:
