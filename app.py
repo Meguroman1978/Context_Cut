@@ -253,7 +253,18 @@ def check_video_has_audio(video_path: str) -> bool:
     try:
         probe = ffmpeg.probe(video_path)
         audio_streams = [stream for stream in probe['streams'] if stream['codec_type'] == 'audio']
-        return len(audio_streams) > 0
+        
+        if len(audio_streams) > 0:
+            # デバッグ情報を表示
+            for i, stream in enumerate(audio_streams):
+                codec = stream.get('codec_name', 'unknown')
+                sample_rate = stream.get('sample_rate', 'unknown')
+                channels = stream.get('channels', 'unknown')
+                duration = stream.get('duration', 'unknown')
+                st.info(f"🔍 音声トラック {i}: コーデック={codec}, サンプリングレート={sample_rate}Hz, チャンネル={channels}, 長さ={duration}秒")
+            return True
+        else:
+            return False
     except Exception as e:
         st.warning(f"動画情報の取得に失敗: {e}")
         return False
@@ -283,35 +294,67 @@ def transcribe_video(video_path: str, model) -> Optional[Dict]:
         
         try:
             # FFmpegで音声を抽出してWAV形式に変換
-            (
-                ffmpeg
-                .input(video_path)
-                .output(tmp_audio_path, acodec='pcm_s16le', ac=1, ar='16000')
-                .overwrite_output()
-                .run(capture_stdout=True, capture_stderr=True, quiet=True)
-            )
+            try:
+                (
+                    ffmpeg
+                    .input(video_path)
+                    .output(
+                        tmp_audio_path,
+                        acodec='pcm_s16le',  # PCM 16-bit
+                        ac=1,                 # モノラル
+                        ar='16000',          # 16kHz サンプリングレート
+                        **{'map': '0:a:0'}   # 最初の音声ストリームを明示的に選択
+                    )
+                    .overwrite_output()
+                    .run(capture_stdout=True, capture_stderr=True)
+                )
+            except ffmpeg.Error as e:
+                stderr_output = e.stderr.decode('utf-8') if e.stderr else 'エラー情報なし'
+                st.error(f"❌ FFmpegでの音声抽出に失敗しました。")
+                st.error(f"**FFmpegエラー詳細**:\n```\n{stderr_output}\n```")
+                if os.path.exists(tmp_audio_path):
+                    os.unlink(tmp_audio_path)
+                return None
             
             # 音声ファイルのサイズチェック
             import os
+            if not os.path.exists(tmp_audio_path):
+                st.error("❌ 音声ファイルが作成されませんでした。")
+                return None
+            
             audio_size = os.path.getsize(tmp_audio_path)
+            st.info(f"🔍 デバッグ情報: 抽出された音声ファイルサイズ = {audio_size:,} bytes")
+            
             if audio_size < 1000:  # 1KB未満
                 st.error("❌ 抽出された音声データが小さすぎます。音声が含まれていない可能性があります。")
+                st.info(f"💡 音声ファイルサイズ: {audio_size} bytes（最低1,000 bytes必要）")
                 os.unlink(tmp_audio_path)
                 return None
             
             # Whisperで文字起こし実行
-            result = model.transcribe(
-                tmp_audio_path, 
-                language='ja', 
-                verbose=False,
-                fp16=False,  # CPU互換性のため
-                temperature=0.0,  # より安定した結果を得る
-                condition_on_previous_text=False  # エラー回避
-            )
+            st.info("🤖 Whisperモデルで音声認識を実行中...")
+            try:
+                result = model.transcribe(
+                    tmp_audio_path, 
+                    language='ja', 
+                    verbose=False,
+                    fp16=False,  # CPU互換性のため
+                    temperature=0.0,  # より安定した結果を得る
+                    condition_on_previous_text=False  # エラー回避
+                )
+            except Exception as whisper_error:
+                st.error(f"❌ Whisperでの音声認識に失敗しました: {whisper_error}")
+                if os.path.exists(tmp_audio_path):
+                    os.unlink(tmp_audio_path)
+                raise whisper_error
             
             # 一時ファイルを削除
-            os.unlink(tmp_audio_path)
+            if os.path.exists(tmp_audio_path):
+                os.unlink(tmp_audio_path)
             
+        except ffmpeg.Error as e:
+            # FFmpegエラーは既に上で処理済み
+            return None
         except Exception as e:
             # 一時ファイルのクリーンアップ
             if os.path.exists(tmp_audio_path):
@@ -333,23 +376,40 @@ def transcribe_video(video_path: str, model) -> Optional[Dict]:
         
     except Exception as e:
         error_msg = str(e)
+        error_type = type(e).__name__
+        
+        st.error(f"❌ 文字起こし処理中にエラーが発生しました（{error_type}）")
+        st.error(f"**エラー詳細**: {error_msg}")
         
         if "cannot reshape tensor" in error_msg:
-            st.error("❌ 音声データの処理に失敗しました。")
-            st.error("**エラー詳細**: 音声ストリームが空または破損しています。")
             st.info("""
-            💡 **対処方法**:
-            1. 動画に音声トラックが含まれているか確認してください
-            2. 別の動画形式（MP4, MOV）で試してください
-            3. 音声付きで動画を再エンコードしてみてください
+            💡 **考えられる原因**: Whisperが音声データを処理できませんでした。
+            
+            **対処方法**:
+            1. 動画に音声トラックが正しく含まれているか確認
+            2. 別の動画形式（MP4, MOV, MKV）で試す
+            3. 音声を再エンコードして修復:
+               ```bash
+               ffmpeg -i input.mp4 -c:v copy -c:a aac -b:a 128k output.mp4
                ```
-               ffmpeg -i input.mp4 -c:v copy -c:a aac output.mp4
-               ```
-            4. または、音声なしで動画編集機能のみ使用してください
+            4. または、動画編集機能のみ使用する
+            """)
+        elif "ffmpeg" in error_msg.lower() or isinstance(e, ffmpeg.Error):
+            st.info("""
+            💡 **考えられる原因**: FFmpegでの音声抽出に失敗しました。
+            
+            **対処方法**:
+            1. 動画ファイルが破損していないか確認
+            2. 動画形式を変換してみる（MP4が最も安定）
+            3. 動画プロパティで音声コーデックを確認（AAC, MP3推奨）
             """)
         else:
-            st.error(f"❌ 文字起こしに失敗しました: {error_msg}")
-            st.info("💡 動画ファイルが破損していないか、または別の動画で試してください。")
+            st.info("""
+            💡 **対処方法**:
+            - 動画ファイルが破損していないか確認
+            - 別の動画で試す
+            - ファイルサイズが大きすぎる場合は短い動画で試す
+            """)
         
         return None
 
@@ -1028,8 +1088,11 @@ def main():
                                     key=f"suggestion_{idx}",
                                     use_container_width=True
                                 ):
-                                    # クリックされた候補を別の変数に保存
+                                    # クリックされた候補を保存し、search_queryに直接設定
                                     st.session_state.selected_suggestion = suggestion
+                                    # 検索クエリ入力欄をクリアして再読み込み
+                                    if 'search_query_input' in st.session_state:
+                                        del st.session_state.search_query_input
                                     st.rerun()
                         
                         st.markdown("---")
@@ -1302,7 +1365,7 @@ def main():
                     # 背景デザイン
                     background_category = st.radio(
                         "背景カテゴリ",
-                        ["シンプル", "吹き出し風"],
+                        ["シンプル", "吹き出し風", "カスタム画像"],
                         key="background_category",
                         horizontal=True
                     )
@@ -1323,7 +1386,7 @@ def main():
                             ],
                             key="background_select_simple"
                         )
-                    else:
+                    elif background_category == "吹き出し風":
                         background_type = st.selectbox(
                             "吹き出しデザイン",
                             [
@@ -1349,6 +1412,110 @@ def main():
                             ],
                             key="background_select_balloon"
                         )
+                    else:  # カスタム画像
+                        st.write("**📤 カスタム背景画像をアップロード**")
+                        custom_bg_file = st.file_uploader(
+                            "PNG画像をアップロード（透過PNG推奨）",
+                            type=['png', 'jpg', 'jpeg'],
+                            key="custom_bg_uploader"
+                        )
+                        
+                        if custom_bg_file:
+                            # アップロードされた画像を保存
+                            custom_bg_path = TEMP_VIDEOS_DIR / f"custom_bg_{custom_bg_file.name}"
+                            with open(custom_bg_path, 'wb') as f:
+                                f.write(custom_bg_file.getbuffer())
+                            st.session_state.custom_bg_path = str(custom_bg_path)
+                            st.success(f"✅ {custom_bg_file.name} をアップロードしました！")
+                            
+                            # プレビュー表示
+                            st.image(custom_bg_path, caption="アップロードした背景画像", width=200)
+                            
+                            # 背景画像のサイズ調整
+                            st.write("**🔧 背景画像のサイズ調整**")
+                            bg_scale = st.slider(
+                                "背景画像のスケール（%）",
+                                min_value=10,
+                                max_value=200,
+                                value=100,
+                                step=5,
+                                key="bg_scale_slider",
+                                help="背景画像のサイズを調整します"
+                            )
+                            st.session_state.bg_scale = bg_scale / 100.0
+                            
+                            # 背景画像の位置選択
+                            st.write("**📍 背景画像の位置選択**")
+                            bg_position_mode = st.radio(
+                                "位置設定",
+                                ["プリセット", "ビジュアル選択"],
+                                key="bg_position_mode",
+                                horizontal=True
+                            )
+                            
+                            if bg_position_mode == "プリセット":
+                                bg_position_preset = st.selectbox(
+                                    "背景位置",
+                                    ["下部中央", "上部中央", "中央", "左下", "右下", "左上", "右上"],
+                                    key="bg_position_select"
+                                )
+                                bg_position_map = {
+                                    "下部中央": ("(main_w-overlay_w)/2", "main_h-overlay_h-80"),
+                                    "上部中央": ("(main_w-overlay_w)/2", "20"),
+                                    "中央": ("(main_w-overlay_w)/2", "(main_h-overlay_h)/2"),
+                                    "左下": ("20", "main_h-overlay_h-20"),
+                                    "右下": ("main_w-overlay_w-20", "main_h-overlay_h-20"),
+                                    "左上": ("20", "20"),
+                                    "右上": ("main_w-overlay_w-20", "20")
+                                }
+                                bg_x_pos, bg_y_pos = bg_position_map[bg_position_preset]
+                            else:  # ビジュアル選択
+                                st.write("**背景画像の位置を選択:**")
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    if st.button("↖️ 左上", key="bg_pos_tl", use_container_width=True):
+                                        st.session_state.bg_visual_position = "左上"
+                                    if st.button("⬅️ 左中", key="bg_pos_ml", use_container_width=True):
+                                        st.session_state.bg_visual_position = "左中"
+                                    if st.button("↙️ 左下", key="bg_pos_bl", use_container_width=True):
+                                        st.session_state.bg_visual_position = "左下"
+                                with col2:
+                                    if st.button("⬆️ 上中", key="bg_pos_tc", use_container_width=True):
+                                        st.session_state.bg_visual_position = "上中"
+                                    if st.button("⏺️ 中央", key="bg_pos_cc", use_container_width=True):
+                                        st.session_state.bg_visual_position = "中央"
+                                    if st.button("⬇️ 下中", key="bg_pos_bc", use_container_width=True):
+                                        st.session_state.bg_visual_position = "下中"
+                                with col3:
+                                    if st.button("↗️ 右上", key="bg_pos_tr", use_container_width=True):
+                                        st.session_state.bg_visual_position = "右上"
+                                    if st.button("➡️ 右中", key="bg_pos_mr", use_container_width=True):
+                                        st.session_state.bg_visual_position = "右中"
+                                    if st.button("↘️ 右下", key="bg_pos_br", use_container_width=True):
+                                        st.session_state.bg_visual_position = "右下"
+                                
+                                selected_bg_pos = st.session_state.get('bg_visual_position', '下中')
+                                st.success(f"✅ 選択中: **{selected_bg_pos}**")
+                                
+                                bg_visual_position_map = {
+                                    "左上": ("20", "20"),
+                                    "上中": ("(main_w-overlay_w)/2", "20"),
+                                    "右上": ("main_w-overlay_w-20", "20"),
+                                    "左中": ("20", "(main_h-overlay_h)/2"),
+                                    "中央": ("(main_w-overlay_w)/2", "(main_h-overlay_h)/2"),
+                                    "右中": ("main_w-overlay_w-20", "(main_h-overlay_h)/2"),
+                                    "左下": ("20", "main_h-overlay_h-20"),
+                                    "下中": ("(main_w-overlay_w)/2", "main_h-overlay_h-80"),
+                                    "右下": ("main_w-overlay_w-20", "main_h-overlay_h-20")
+                                }
+                                bg_x_pos, bg_y_pos = bg_visual_position_map[selected_bg_pos]
+                            
+                            st.session_state.bg_x_pos = bg_x_pos
+                            st.session_state.bg_y_pos = bg_y_pos
+                            
+                            background_type = "custom"
+                        else:
+                            st.warning("背景画像をアップロードしてください")\n                            background_type = "なし（透明）"
                     
                     # 位置設定
                     position_mode = st.radio(
@@ -1378,58 +1545,9 @@ def main():
                     
                     elif position_mode == "ビジュアル選択":
                         st.write("**ビジュアル位置選択**")
-                        st.info("📍 グリッドから位置を選択してください。吹き出し背景を使用する場合は、自動調整オプションをオンにすることをおすすめします。")
+                        st.info("📍 ボタンをクリックして位置を選択してください。")
                         
-                        # 3x3グリッドで位置を選択
-                        st.write("**位置を選択:**")
-                        
-                        # グリッドのHTMLを生成
-                        grid_html = """
-                        <style>
-                        .position-grid {
-                            display: grid;
-                            grid-template-columns: repeat(3, 1fr);
-                            gap: 10px;
-                            max-width: 400px;
-                            margin: 20px 0;
-                        }
-                        .position-cell {
-                            aspect-ratio: 1;
-                            border: 2px solid #ddd;
-                            border-radius: 8px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            cursor: pointer;
-                            background: #f8f9fa;
-                            font-size: 24px;
-                            transition: all 0.2s;
-                        }
-                        .position-cell:hover {
-                            background: #e9ecef;
-                            border-color: #0066cc;
-                        }
-                        .position-cell.selected {
-                            background: #0066cc;
-                            color: white;
-                            border-color: #0066cc;
-                        }
-                        </style>
-                        <div class="position-grid">
-                            <div class="position-cell">↖️</div>
-                            <div class="position-cell">⬆️</div>
-                            <div class="position-cell">↗️</div>
-                            <div class="position-cell">⬅️</div>
-                            <div class="position-cell">⏺️</div>
-                            <div class="position-cell">➡️</div>
-                            <div class="position-cell">↙️</div>
-                            <div class="position-cell">⬇️</div>
-                            <div class="position-cell">↘️</div>
-                        </div>
-                        """
-                        st.markdown(grid_html, unsafe_allow_html=True)
-                        
-                        # ボタンで位置を選択
+                        # ボタンで位置を選択（機能しないHTMLグリッドを削除）
                         col1, col2, col3 = st.columns(3)
                         with col1:
                             if st.button("↖️ 左上", key="pos_tl", use_container_width=True):
