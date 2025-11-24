@@ -1516,31 +1516,9 @@ def main():
                     # 文字色
                     font_color = st.color_picker("文字色", "#FFFFFF", key="font_color_picker")
                     
-                    # 自動調整オプション（吹き出し背景の場合のみ表示）
-                    if background_category == "吹き出し風":
-                        st.subheader("⚙️ 自動調整オプション")
-                        
-                        auto_position = st.checkbox(
-                            "🎯 テキストの表示位置を吹き出しの中央に合わせる",
-                            value=False,
-                            key="auto_position_checkbox",
-                            help="有効にすると、テキストを吹き出しの中央に自動配置します（手動位置指定より優先されます）"
-                        )
-                        
-                        auto_size = st.checkbox(
-                            "📊 テキストサイズを背景のサイズに合わせて自動調整",
-                            value=False,
-                            key="auto_size_checkbox",
-                            help="吹き出し背景のサイズに応じてフォントサイズを自動調整します（吹き出し幅60-70%のサイズ）"
-                        )
-                    else:
-                        # 吹き出し背景以外ではauto_positionを無効化
-                        auto_position = False
-                        auto_size = False
-                    
                     st.markdown("---")
                     
-                    # 背景デザイン
+                    # 背景デザイン（先に定義）
                     background_category = st.radio(
                         "背景カテゴリ",
                         ["シンプル", "吹き出し風", "カスタム画像"],
@@ -1647,6 +1625,22 @@ def main():
                                 st.info(f"📉 元のサイズの{balloon_scale}%に縮小されます")
                             else:
                                 st.info(f"📈 元のサイズの{balloon_scale}%に拡大されます")
+                        
+                        # 吹き出し背景の自動調整オプション
+                        st.write("**⚙️ 自動調整オプション**")
+                        auto_position = st.checkbox(
+                            "🎯 テキストの表示位置を吹き出しの中央に合わせる",
+                            value=False,
+                            key="auto_position_checkbox",
+                            help="有効にすると、テキストを吹き出しの中央に自動配置します（手動位置指定より優先されます）"
+                        )
+                        
+                        auto_size = st.checkbox(
+                            "📊 テキストサイズを背景のサイズに合わせて自動調整",
+                            value=False,
+                            key="auto_size_checkbox",
+                            help="吹き出し背景のサイズに応じてフォントサイズを自動調整します（吹き出し幅60-70%のサイズ）"
+                        )
                     else:  # カスタム画像
                         st.write("**📤 カスタム背景画像をアップロード**")
                         custom_bg_file = st.file_uploader(
@@ -1761,6 +1755,11 @@ def main():
                         else:
                             st.warning("背景画像をアップロードしてください")
                             background_type = "なし（透明）"
+                    
+                    # シンプル背景とカスタム画像ではauto_positionを無効化
+                    if background_category != "吹き出し風":
+                        auto_position = False
+                        auto_size = False
                     
                     # 位置設定
                     position_mode = st.radio(
