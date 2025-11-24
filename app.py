@@ -635,8 +635,11 @@ def generate_final_video_with_subtitle(
             
             # 自動位置調整が有効の場合、吹き出しの中央にテキストを配置
             if auto_position:
-                text_x = '(w-text_w)/2'  # 水平中央
-                text_y = 'h-200'         # 吹き出しの中央付近
+                # 吹き出し画像の中心を計算
+                # 吹き出し画像は下から80pxの位置にあり、高さは約400px
+                # 吹き出しの中心 = 下から80px + 吹き出し高さの半分(200px) = 下から280px
+                text_x = '(w-text_w)/2'           # 水平方向は中央
+                text_y = 'h-280-(text_h/2)'       # 吹き出しの垂直中央
             else:
                 text_x = x_position
                 text_y = y_position
@@ -994,8 +997,12 @@ def main():
                 st.warning("⚠️ 文字起こしがスキップされたため、シーン検索機能は使用できません。")
                 st.info("💡 シーン検索を使用する場合は、サイドバーから「文字起こしを実行」を行ってください。\n\nまたは、「✂️ カット範囲指定」タブで手動で範囲を指定してください。")
             else:
+                # 検索クエリ候補がクリックされた場合の初期値
+                default_query = st.session_state.get('selected_suggestion', '')
+                
                 search_query = st.text_input(
                     "検索クエリを入力",
+                    value=default_query,
                     placeholder="例: 面白いシーン, 感動的な場面, 商品の説明",
                     key="search_query_input"
                 )
@@ -1021,11 +1028,16 @@ def main():
                                     key=f"suggestion_{idx}",
                                     use_container_width=True
                                 ):
-                                    # クリックされた候補を検索クエリに設定
-                                    st.session_state.search_query_input = suggestion
+                                    # クリックされた候補を別の変数に保存
+                                    st.session_state.selected_suggestion = suggestion
                                     st.rerun()
                         
                         st.markdown("---")
+                
+                # 検索実行後は選択された候補をクリア
+                if 'selected_suggestion' in st.session_state and search_query:
+                    if search_query == st.session_state.selected_suggestion:
+                        del st.session_state.selected_suggestion
                 
                 n_results = st.slider("検索結果数", 1, 10, 5)
                 
@@ -1341,7 +1353,7 @@ def main():
                     # 位置設定
                     position_mode = st.radio(
                         "位置設定モード",
-                        ["プリセット", "カスタム（詳細）"],
+                        ["プリセット", "ビジュアル選択", "カスタム（詳細）"],
                         key="position_mode",
                         horizontal=True
                     )
@@ -1363,6 +1375,104 @@ def main():
                             "右上": ("w-text_w-20", "20")
                         }
                         x_pos, y_pos = position_map[position_preset]
+                    
+                    elif position_mode == "ビジュアル選択":
+                        st.write("**ビジュアル位置選択**")
+                        st.info("📍 グリッドから位置を選択してください。吹き出し背景を使用する場合は、自動調整オプションをオンにすることをおすすめします。")
+                        
+                        # 3x3グリッドで位置を選択
+                        st.write("**位置を選択:**")
+                        
+                        # グリッドのHTMLを生成
+                        grid_html = """
+                        <style>
+                        .position-grid {
+                            display: grid;
+                            grid-template-columns: repeat(3, 1fr);
+                            gap: 10px;
+                            max-width: 400px;
+                            margin: 20px 0;
+                        }
+                        .position-cell {
+                            aspect-ratio: 1;
+                            border: 2px solid #ddd;
+                            border-radius: 8px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            cursor: pointer;
+                            background: #f8f9fa;
+                            font-size: 24px;
+                            transition: all 0.2s;
+                        }
+                        .position-cell:hover {
+                            background: #e9ecef;
+                            border-color: #0066cc;
+                        }
+                        .position-cell.selected {
+                            background: #0066cc;
+                            color: white;
+                            border-color: #0066cc;
+                        }
+                        </style>
+                        <div class="position-grid">
+                            <div class="position-cell">↖️</div>
+                            <div class="position-cell">⬆️</div>
+                            <div class="position-cell">↗️</div>
+                            <div class="position-cell">⬅️</div>
+                            <div class="position-cell">⏺️</div>
+                            <div class="position-cell">➡️</div>
+                            <div class="position-cell">↙️</div>
+                            <div class="position-cell">⬇️</div>
+                            <div class="position-cell">↘️</div>
+                        </div>
+                        """
+                        st.markdown(grid_html, unsafe_allow_html=True)
+                        
+                        # ボタンで位置を選択
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            if st.button("↖️ 左上", key="pos_tl", use_container_width=True):
+                                st.session_state.visual_position = "左上"
+                            if st.button("⬅️ 左中", key="pos_ml", use_container_width=True):
+                                st.session_state.visual_position = "左中"
+                            if st.button("↙️ 左下", key="pos_bl", use_container_width=True):
+                                st.session_state.visual_position = "左下"
+                        
+                        with col2:
+                            if st.button("⬆️ 上中", key="pos_tc", use_container_width=True):
+                                st.session_state.visual_position = "上中"
+                            if st.button("⏺️ 中央", key="pos_cc", use_container_width=True):
+                                st.session_state.visual_position = "中央"
+                            if st.button("⬇️ 下中", key="pos_bc", use_container_width=True):
+                                st.session_state.visual_position = "下中"
+                        
+                        with col3:
+                            if st.button("↗️ 右上", key="pos_tr", use_container_width=True):
+                                st.session_state.visual_position = "右上"
+                            if st.button("➡️ 右中", key="pos_mr", use_container_width=True):
+                                st.session_state.visual_position = "右中"
+                            if st.button("↘️ 右下", key="pos_br", use_container_width=True):
+                                st.session_state.visual_position = "右下"
+                        
+                        # 選択された位置を表示
+                        selected_pos = st.session_state.get('visual_position', '下中')
+                        st.success(f"✅ 選択中: **{selected_pos}**")
+                        
+                        # 位置マッピング（9分割）
+                        visual_position_map = {
+                            "左上": ("20", "20"),
+                            "上中": ("(w-text_w)/2", "20"),
+                            "右上": ("w-text_w-20", "20"),
+                            "左中": ("20", "(h-text_h)/2"),
+                            "中央": ("(w-text_w)/2", "(h-text_h)/2"),
+                            "右中": ("w-text_w-20", "(h-text_h)/2"),
+                            "左下": ("20", "h-text_h-20"),
+                            "下中": ("(w-text_w)/2", "h-text_h-20"),
+                            "右下": ("w-text_w-20", "h-text_h-20")
+                        }
+                        x_pos, y_pos = visual_position_map[selected_pos]
+                    
                     else:
                         # カスタム位置設定
                         st.write("**カスタム位置設定**")
