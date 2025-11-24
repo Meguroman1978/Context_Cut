@@ -505,6 +505,10 @@ def main():
         st.session_state.preview_scene_start = 0.0
     if 'preview_scene_end' not in st.session_state:
         st.session_state.preview_scene_end = 0.0
+    if 'active_tab' not in st.session_state:
+        st.session_state.active_tab = 0
+    if 'scene_preview_dialog_open' not in st.session_state:
+        st.session_state.scene_preview_dialog_open = False
     
     # サイドバー: 動画取得
     with st.sidebar:
@@ -708,8 +712,17 @@ def main():
     # メインエリア
     if st.session_state.video_path and st.session_state.transcription:
         
-        # タブUI
-        tab1, tab2, tab3 = st.tabs(["🔍 シーン検索", "✂️ カット範囲指定", "💬 テロップ編集"])
+        # タブUIの選択状態を管理
+        tab_names = ["🔍 シーン検索", "✂️ カット範囲指定", "💬 テロップ編集"]
+        
+        # タブの選択を制御
+        if 'force_tab_index' in st.session_state:
+            # Streamlit 1.31.0以降ではst.tabsに選択インデックスを渡せないため、
+            # ページ全体をリロードする方法を使用
+            st.session_state.active_tab = st.session_state.force_tab_index
+            del st.session_state.force_tab_index
+        
+        tab1, tab2, tab3 = st.tabs(tab_names)
         
         # タブ1: シーン検索
         with tab1:
@@ -746,37 +759,48 @@ def main():
                                 with col_btn1:
                                     # シーンプレビューボタン
                                     if st.button(f"このシーンをプレビュー", key=f"preview_{i}", use_container_width=True):
-                                        st.session_state.show_scene_preview = True
+                                        # プレビュー用のセッション状態を設定
                                         st.session_state.preview_scene_start = scene['start']
                                         st.session_state.preview_scene_end = scene['end']
                                         st.session_state.preview_scene_id = i
-                                        st.rerun()
+                                        st.session_state.scene_preview_dialog_open = True
+                                        
+                                        # プレビュー動画を生成
+                                        preview_path = str(TEMP_VIDEOS_DIR / f"scene_preview_{i}.mp4")
+                                        create_preview_clip(
+                                            st.session_state.video_path,
+                                            scene['start'],
+                                            scene['end'],
+                                            preview_path
+                                        )
+                                        st.session_state.current_scene_preview_path = preview_path
                                 
                                 with col_btn2:
                                     # シーンを選択ボタン
                                     if st.button(f"このシーンを選択", key=f"select_{i}", use_container_width=True):
                                         st.session_state.selected_start = scene['start']
                                         st.session_state.selected_end = scene['end']
+                                        st.session_state.force_tab_index = 1  # カット範囲指定タブに移動
+                                        st.success(f"✅ シーンを選択しました！カット範囲指定タブに移動します...")
                                         st.rerun()
                         
-                        # シーンプレビューのポップアップ表示
-                        if st.session_state.show_scene_preview:
-                            st.divider()
-                            st.subheader(f"🎬 シーン {st.session_state.get('preview_scene_id', '')} のプレビュー")
-                            
-                            with st.spinner("プレビューを生成中..."):
-                                preview_path = str(TEMP_VIDEOS_DIR / f"scene_preview_{st.session_state.preview_scene_id}.mp4")
-                                if create_preview_clip(
-                                    st.session_state.video_path,
-                                    st.session_state.preview_scene_start,
-                                    st.session_state.preview_scene_end,
-                                    preview_path
-                                ):
-                                    st.video(preview_path)
-                            
-                            if st.button("✖️ プレビューを閉じる"):
-                                st.session_state.show_scene_preview = False
-                                st.rerun()
+                        # シーンプレビューのダイアログ（ポップアップ）
+                        @st.dialog("🎬 シーンプレビュー", width="small")
+                        def show_scene_preview_dialog():
+                            if 'current_scene_preview_path' in st.session_state:
+                                st.write(f"**シーン {st.session_state.preview_scene_id}**")
+                                st.write(f"⏱️ {st.session_state.preview_scene_start:.2f}秒 - {st.session_state.preview_scene_end:.2f}秒")
+                                
+                                # 小さいサイズでプレビュー表示
+                                st.video(st.session_state.current_scene_preview_path, loop=True)
+                                
+                                if st.button("✖️ 閉じる", use_container_width=True):
+                                    st.session_state.scene_preview_dialog_open = False
+                                    st.rerun()
+                        
+                        # ダイアログを表示
+                        if st.session_state.scene_preview_dialog_open:
+                            show_scene_preview_dialog()
                     else:
                         st.warning("検索結果が見つかりませんでした。")
         
@@ -784,44 +808,57 @@ def main():
         with tab2:
             st.header("✂️ カット範囲の指定")
             
-            col1, col2 = st.columns(2)
+            # セッション状態の範囲を取得（動画の長さを超えないように）
+            safe_end = min(st.session_state.selected_end, st.session_state.video_duration)
+            if safe_end <= st.session_state.selected_start:
+                safe_end = min(st.session_state.selected_start + 5.0, st.session_state.video_duration)
             
-            with col1:
-                start_time = st.number_input(
-                    "開始時間（秒）",
-                    min_value=0.0,
-                    max_value=st.session_state.video_duration,
-                    value=float(st.session_state.selected_start),
-                    step=0.1,
-                    key="cut_start_input"
-                )
-            
-            with col2:
-                end_time = st.number_input(
-                    "終了時間（秒）",
-                    min_value=0.0,
-                    max_value=st.session_state.video_duration,
-                    value=float(st.session_state.selected_end if st.session_state.selected_end <= st.session_state.video_duration else min(10.0, st.session_state.video_duration)),
-                    step=0.1,
-                    key="cut_end_input"
-                )
-            
-            st.write(f"選択範囲: {end_time - start_time:.2f}秒")
-            
-            # スライダーでの微調整
-            st.subheader("スライダーで微調整")
+            # スライダーでの範囲選択（最初に表示）
+            st.subheader("スライダーで範囲選択")
             time_range = st.slider(
                 "範囲選択",
                 0.0,
                 st.session_state.video_duration,
-                (float(st.session_state.selected_start), float(st.session_state.selected_end if st.session_state.selected_end <= st.session_state.video_duration else min(10.0, st.session_state.video_duration))),
+                (float(st.session_state.selected_start), float(safe_end)),
                 step=0.1,
                 key="cut_range_slider"
             )
             
             start_time, end_time = time_range
             
-            # 選択範囲を更新
+            # Number Inputでの詳細設定
+            st.subheader("詳細設定")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                start_time_input = st.number_input(
+                    "開始時間（秒）",
+                    min_value=0.0,
+                    max_value=st.session_state.video_duration,
+                    value=float(start_time),
+                    step=0.1,
+                    key="cut_start_input"
+                )
+                # Number Inputが変更された場合はそれを優先
+                if start_time_input != start_time:
+                    start_time = start_time_input
+            
+            with col2:
+                end_time_input = st.number_input(
+                    "終了時間（秒）",
+                    min_value=0.0,
+                    max_value=st.session_state.video_duration,
+                    value=float(end_time),
+                    step=0.1,
+                    key="cut_end_input"
+                )
+                # Number Inputが変更された場合はそれを優先
+                if end_time_input != end_time:
+                    end_time = end_time_input
+            
+            st.write(f"📏 選択範囲: {end_time - start_time:.2f}秒")
+            
+            # 選択範囲を更新（次回のリロード時に反映）
             st.session_state.selected_start = start_time
             st.session_state.selected_end = end_time
             
@@ -888,19 +925,85 @@ def main():
                         key="background_select"
                     )
                     
-                    # 位置設定（簡易版）
-                    position_preset = st.selectbox(
-                        "テロップ位置",
-                        ["下部中央", "上部中央", "中央"],
-                        key="position_select"
+                    # 位置設定
+                    position_mode = st.radio(
+                        "位置設定モード",
+                        ["プリセット", "カスタム（詳細）"],
+                        key="position_mode",
+                        horizontal=True
                     )
                     
-                    position_map = {
-                        "下部中央": ("(w-text_w)/2", "h-text_h-20"),
-                        "上部中央": ("(w-text_w)/2", "20"),
-                        "中央": ("(w-text_w)/2", "(h-text_h)/2")
-                    }
-                    x_pos, y_pos = position_map[position_preset]
+                    if position_mode == "プリセット":
+                        position_preset = st.selectbox(
+                            "テロップ位置",
+                            ["下部中央", "上部中央", "中央", "左下", "右下", "左上", "右上"],
+                            key="position_select"
+                        )
+                        
+                        position_map = {
+                            "下部中央": ("(w-text_w)/2", "h-text_h-20"),
+                            "上部中央": ("(w-text_w)/2", "20"),
+                            "中央": ("(w-text_w)/2", "(h-text_h)/2"),
+                            "左下": ("20", "h-text_h-20"),
+                            "右下": ("w-text_w-20", "h-text_h-20"),
+                            "左上": ("20", "20"),
+                            "右上": ("w-text_w-20", "20")
+                        }
+                        x_pos, y_pos = position_map[position_preset]
+                    else:
+                        # カスタム位置設定
+                        st.write("**カスタム位置設定**")
+                        st.info("💡 座標は動画サイズに対する相対値です。(w=動画幅, h=動画高さ, text_w=テキスト幅, text_h=テキスト高さ)")
+                        
+                        col_x, col_y = st.columns(2)
+                        
+                        with col_x:
+                            x_pos_type = st.selectbox(
+                                "X位置の基準",
+                                ["左端からの距離", "中央揃え", "右端からの距離", "カスタム式"],
+                                key="x_pos_type"
+                            )
+                            
+                            if x_pos_type == "左端からの距離":
+                                x_offset = st.number_input("左端からのピクセル数", 0, 1000, 20, key="x_offset")
+                                x_pos = str(x_offset)
+                            elif x_pos_type == "中央揃え":
+                                x_pos = "(w-text_w)/2"
+                            elif x_pos_type == "右端からの距離":
+                                x_offset = st.number_input("右端からのピクセル数", 0, 1000, 20, key="x_offset_right")
+                                x_pos = f"w-text_w-{x_offset}"
+                            else:
+                                x_pos = st.text_input(
+                                    "X位置の式",
+                                    "(w-text_w)/2",
+                                    key="x_pos_custom",
+                                    help="例: (w-text_w)/2 (中央), 50 (左から50px), w-text_w-50 (右から50px)"
+                                )
+                        
+                        with col_y:
+                            y_pos_type = st.selectbox(
+                                "Y位置の基準",
+                                ["上端からの距離", "中央揃え", "下端からの距離", "カスタム式"],
+                                key="y_pos_type"
+                            )
+                            
+                            if y_pos_type == "上端からの距離":
+                                y_offset = st.number_input("上端からのピクセル数", 0, 1000, 20, key="y_offset")
+                                y_pos = str(y_offset)
+                            elif y_pos_type == "中央揃え":
+                                y_pos = "(h-text_h)/2"
+                            elif y_pos_type == "下端からの距離":
+                                y_offset = st.number_input("下端からのピクセル数", 0, 1000, 20, key="y_offset_bottom")
+                                y_pos = f"h-text_h-{y_offset}"
+                            else:
+                                y_pos = st.text_input(
+                                    "Y位置の式",
+                                    "h-text_h-20",
+                                    key="y_pos_custom",
+                                    help="例: (h-text_h)/2 (中央), 50 (上から50px), h-text_h-50 (下から50px)"
+                                )
+                        
+                        st.write(f"**現在の座標式**: X=`{x_pos}`, Y=`{y_pos}`")
                     
                     # リアルタイムプレビュー生成ボタン
                     if st.button("🔄 プレビューを更新", key="update_preview"):
