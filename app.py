@@ -443,6 +443,69 @@ def search_scenes(query: str, collection_name: str, client: chromadb.Client, n_r
         return []
 
 
+def generate_search_suggestions(transcript_text: str, max_suggestions: int = 10) -> List[str]:
+    """文字起こしテキストから検索クエリ候補を生成"""
+    suggestions = []
+    
+    # キーワードベースのパターン
+    keyword_patterns = {
+        "説明": "について説明している箇所",
+        "使い方": "使用方法について説明している箇所",
+        "使用方法": "使用方法について説明している箇所",
+        "メンテナンス": "メンテナンス方法について説明している箇所",
+        "手入れ": "お手入れ方法について説明している箇所",
+        "サイズ": "サイズについて説明している箇所",
+        "価格": "価格について説明している箇所",
+        "料金": "料金について説明している箇所",
+        "特徴": "特徴について説明している箇所",
+        "機能": "機能について説明している箇所",
+        "効果": "効果について説明している箇所",
+        "注意": "注意点について説明している箇所",
+        "ポイント": "重要なポイントを説明している箇所",
+        "コツ": "コツについて説明している箇所",
+        "手順": "手順について説明している箇所",
+        "方法": "方法について説明している箇所",
+        "やり方": "やり方について説明している箇所",
+        "問題": "問題について説明している箇所",
+        "解決": "解決方法について説明している箇所",
+        "比較": "比較している箇所",
+        "違い": "違いについて説明している箇所",
+        "おすすめ": "おすすめについて説明している箇所",
+        "メリット": "メリットについて説明している箇所",
+        "デメリット": "デメリットについて説明している箇所",
+    }
+    
+    # 文字起こしテキストから検出
+    text_lower = transcript_text.lower()
+    
+    for keyword, suggestion_template in keyword_patterns.items():
+        if keyword in text_lower:
+            suggestions.append(suggestion_template)
+    
+    # 汎用的な候補を追加
+    if len(suggestions) < 3:
+        generic_suggestions = [
+            "重要な説明をしている箇所",
+            "詳しく説明している箇所",
+            "具体例を挙げている箇所",
+            "まとめている箇所",
+            "強調している箇所"
+        ]
+        suggestions.extend(generic_suggestions)
+    
+    # 重複を削除して最大数に制限
+    seen = set()
+    unique_suggestions = []
+    for s in suggestions:
+        if s not in seen:
+            seen.add(s)
+            unique_suggestions.append(s)
+            if len(unique_suggestions) >= max_suggestions:
+                break
+    
+    return unique_suggestions
+
+
 def get_video_duration(video_path: str) -> float:
     """動画の長さを取得"""
     try:
@@ -914,8 +977,36 @@ def main():
             else:
                 search_query = st.text_input(
                     "検索クエリを入力",
-                    placeholder="例: 面白いシーン, 感動的な場面, 商品の説明"
+                    placeholder="例: 面白いシーン, 感動的な場面, 商品の説明",
+                    key="search_query_input"
                 )
+                
+                # 検索クエリ候補の自動生成と表示
+                if 'transcript_text' in st.session_state and st.session_state.transcript_text:
+                    if 'search_suggestions' not in st.session_state:
+                        # 文字起こしから検索クエリ候補を生成
+                        st.session_state.search_suggestions = generate_search_suggestions(
+                            st.session_state.transcript_text
+                        )
+                    
+                    if st.session_state.search_suggestions:
+                        st.write("💡 **検索クエリ候補**（クリックで自動入力）")
+                        
+                        # 候補をボタンで表示
+                        cols = st.columns(2)
+                        for idx, suggestion in enumerate(st.session_state.search_suggestions):
+                            col_idx = idx % 2
+                            with cols[col_idx]:
+                                if st.button(
+                                    f"🔍 {suggestion}",
+                                    key=f"suggestion_{idx}",
+                                    use_container_width=True
+                                ):
+                                    # クリックされた候補を検索クエリに設定
+                                    st.session_state.search_query_input = suggestion
+                                    st.rerun()
+                        
+                        st.markdown("---")
                 
                 n_results = st.slider("検索結果数", 1, 10, 5)
                 
@@ -1158,6 +1249,25 @@ def main():
                     # 文字色
                     font_color = st.color_picker("文字色", "#FFFFFF", key="font_color_picker")
                     
+                    # 自動調整オプション
+                    st.subheader("⚙️ 自動調整オプション")
+                    
+                    auto_position = st.checkbox(
+                        "🎯 テキストの表示位置を背景の位置に合わせる",
+                        value=True,
+                        key="auto_position_checkbox",
+                        help="吹き出し背景を使用する場合、テキストを吹き出しの中央に配置します"
+                    )
+                    
+                    auto_size = st.checkbox(
+                        "📊 テキストサイズを背景のサイズに合わせて自動調整",
+                        value=False,
+                        key="auto_size_checkbox",
+                        help="吹き出し背景のサイズに応じてフォントサイズを自動調整します（吹き出し幅60-70%のサイズ）"
+                    )
+                    
+                    st.markdown("---")
+                    
                     # 背景デザイン
                     background_category = st.radio(
                         "背景カテゴリ",
@@ -1305,7 +1415,9 @@ def main():
                                     font_color,
                                     background_type,
                                     x_pos,
-                                    y_pos
+                                    y_pos,
+                                    auto_position=st.session_state.get('auto_position_checkbox', True),
+                                    auto_size=st.session_state.get('auto_size_checkbox', False)
                                 )
                                 if success:
                                     st.session_state.preview_with_subtitle_path = preview_with_subtitle_path
@@ -1383,7 +1495,9 @@ def main():
                                 font_color,
                                 background_type,
                                 x_pos,
-                                y_pos
+                                y_pos,
+                                auto_position=st.session_state.get('auto_position_checkbox', True),
+                                auto_size=st.session_state.get('auto_size_checkbox', False)
                             )
                             
                             if success:
