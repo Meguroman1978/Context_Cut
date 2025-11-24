@@ -262,21 +262,61 @@ def check_video_has_audio(video_path: str) -> bool:
 def transcribe_video(video_path: str, model) -> Optional[Dict]:
     """動画から音声を文字起こし"""
     try:
+        # 動画の長さをチェック
+        duration = get_video_duration(video_path)
+        if duration < 0.5:
+            st.error(f"❌ 動画が短すぎます（{duration:.2f}秒）。最低0.5秒以上の動画が必要です。")
+            return None
+        
         # 音声トラックの確認
         if not check_video_has_audio(video_path):
             st.error("❌ この動画には音声トラックがありません。")
             st.info("💡 音声付きの動画を使用するか、音声なしで動画編集を行ってください。")
             return None
         
-        st.info("🎤 動画を文字起こし中... (数分かかる場合があります)")
+        st.info(f"🎤 動画を文字起こし中... （動画の長さ: {duration:.1f}秒、数分かかる場合があります）")
         
-        # Whisperで文字起こし実行
-        result = model.transcribe(
-            video_path, 
-            language='ja', 
-            verbose=False,
-            fp16=False  # CPU互換性のため
-        )
+        # 一時的な音声ファイルを作成（Whisperが処理しやすい形式に変換）
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_audio:
+            tmp_audio_path = tmp_audio.name
+        
+        try:
+            # FFmpegで音声を抽出してWAV形式に変換
+            (
+                ffmpeg
+                .input(video_path)
+                .output(tmp_audio_path, acodec='pcm_s16le', ac=1, ar='16000')
+                .overwrite_output()
+                .run(capture_stdout=True, capture_stderr=True, quiet=True)
+            )
+            
+            # 音声ファイルのサイズチェック
+            import os
+            audio_size = os.path.getsize(tmp_audio_path)
+            if audio_size < 1000:  # 1KB未満
+                st.error("❌ 抽出された音声データが小さすぎます。音声が含まれていない可能性があります。")
+                os.unlink(tmp_audio_path)
+                return None
+            
+            # Whisperで文字起こし実行
+            result = model.transcribe(
+                tmp_audio_path, 
+                language='ja', 
+                verbose=False,
+                fp16=False,  # CPU互換性のため
+                temperature=0.0,  # より安定した結果を得る
+                condition_on_previous_text=False  # エラー回避
+            )
+            
+            # 一時ファイルを削除
+            os.unlink(tmp_audio_path)
+            
+        except Exception as e:
+            # 一時ファイルのクリーンアップ
+            if os.path.exists(tmp_audio_path):
+                os.unlink(tmp_audio_path)
+            raise e
         
         # 結果の検証
         if not result or 'segments' not in result:
