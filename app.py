@@ -1016,32 +1016,58 @@ def main():
             """, unsafe_allow_html=True)
             
             # スライダーの範囲を選択範囲の前後30秒に限定（より直感的に）
-            slider_min = max(0.0, initial_start - 30.0)
-            slider_max = min(st.session_state.video_duration, initial_end + 30.0)
+            # エラー回避のため、範囲を安全に計算
+            try:
+                slider_buffer = 30.0
+                slider_min = max(0.0, initial_start - slider_buffer)
+                slider_max = min(st.session_state.video_duration, initial_end + slider_buffer)
+                
+                # slider_maxがslider_minより小さい場合の対処
+                if slider_max <= slider_min:
+                    slider_max = slider_min + 10.0
+                
+                # initial_startとinitial_endがslider範囲外の場合の対処
+                if initial_start < slider_min:
+                    slider_min = initial_start
+                if initial_end > slider_max:
+                    slider_max = initial_end
+                
+                # スライダーの上にラベルを追加
+                st.markdown(f"""
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; color: #666;">
+                        <span>🔻 範囲: <strong>{slider_min:.2f}秒</strong></span>
+                        <span>🔺 範囲: <strong>{slider_max:.2f}秒</strong></span>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # スライダーのデフォルト値を設定
+                time_range = st.slider(
+                    "開始・終了時間を調整（スライダーを動かして微調整）",
+                    min_value=slider_min,
+                    max_value=slider_max,
+                    value=(initial_start, initial_end),
+                    step=0.1,
+                    key="cut_range_slider"
+                )
+                
+                start_time, end_time = time_range
+                
+                # スライダー調整後の値を表示
+                if (start_time != initial_start) or (end_time != initial_end):
+                    st.warning(f"⚠️ スライダーを調整しました: {start_time:.2f}秒 〜 {end_time:.2f}秒")
             
-            # スライダーの上にラベルを追加
-            st.markdown(f"""
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; color: #666;">
-                    <span>🔻 範囲: <strong>{slider_min:.2f}秒</strong></span>
-                    <span>🔺 範囲: <strong>{slider_max:.2f}秒</strong></span>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            # スライダーのデフォルト値を設定
-            time_range = st.slider(
-                "開始・終了時間を調整（スライダーを動かして微調整）",
-                min_value=slider_min,
-                max_value=slider_max,
-                value=(initial_start, initial_end),
-                step=0.1,
-                key="cut_range_slider"
-            )
-            
-            start_time, end_time = time_range
-            
-            # スライダー調整後の値を表示
-            if (start_time != initial_start) or (end_time != initial_end):
-                st.warning(f"⚠️ スライダーを調整しましぞ: {start_time:.2f}秒 〜 {end_time:.2f}秒")
+            except Exception as e:
+                st.error(f"スライダーの初期化エラー: {e}")
+                # フォールバック: 動画全体の範囲でスライダーを作成
+                time_range = st.slider(
+                    "開始・終了時間を調整",
+                    min_value=0.0,
+                    max_value=st.session_state.video_duration,
+                    value=(initial_start, initial_end),
+                    step=0.1,
+                    key="cut_range_slider_fallback"
+                )
+                start_time, end_time = time_range
             
             # 選択範囲を表示
             col1, col2, col3 = st.columns(3)
@@ -1055,9 +1081,6 @@ def main():
             # 選択範囲を更新（次回のリロード時に反映）
             st.session_state.selected_start = start_time
             st.session_state.selected_end = end_time
-            
-            # デバッグ情報を表示
-            st.write(f"🔍 デバッグ: start_time={start_time:.2f}, end_time={end_time:.2f}")
             
             # プレビュー生成
             if st.button("プレビューを生成"):
