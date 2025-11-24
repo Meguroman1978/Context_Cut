@@ -568,15 +568,134 @@ def generate_search_suggestions(transcript_text: str, max_suggestions: int = 10)
     """文字起こしテキストから検索クエリ候補を生成"""
     suggestions = []
     
-    # キーワードベースのパターン
+    # 優先度の高い定型クエリ候補リスト
+    priority_queries = [
+        "商品の特徴について説明している箇所",
+        "デザインについて説明をしている箇所",
+        "使用方法について説明をしている箇所",
+        "メンテナンス方法について説明をしている箇所",
+        "保証について説明をしている箇所",
+        "味・風味について説明している箇所",
+        "色味について説明している箇所",
+        "香りについて説明している箇所",
+        "肌触り・テクスチャーについて説明している箇所",
+        "着心地・フィット感について説明している箇所",
+        "使いやすさについて説明している箇所",
+        "携帯性（持ち運びやすさ）について説明している箇所",
+        "静粛性・打鍵感について説明している箇所",
+        "視認性（画面の明るさ、文字の見やすさ）について説明している箇所",
+        "サイズ・寸法について説明している箇所",
+        "重量について説明している箇所",
+        "原材料・素材について説明している箇所",
+        "成分・添加物について説明している箇所",
+        "アレルギー物質について説明している箇所",
+        "原産国・製造国について説明している箇所",
+        "カラーバリエーションについて説明している箇所",
+        "付属品・同梱物について説明している箇所",
+        "製造年月日・消費期限について説明している箇所",
+        "スペック・性能について説明している箇所",
+        "耐久性・寿命について説明している箇所",
+        "防水・防塵性能について説明している箇所",
+        "静音性について説明している箇所",
+        "省エネ性能・消費電力について説明している箇所",
+        "認証・取得規格について説明している箇所",
+        "互換性について説明している箇所",
+        "動作環境について説明している箇所",
+        "通信方式について説明している箇所",
+        "処理速度について説明している箇所",
+        "安全上の注意・警告について説明している箇所",
+        "使用禁止事項について説明している箇所",
+        "対象年齢について説明している箇所",
+        "副作用・リスクについて説明している箇所",
+        "免責事項（責任の範囲）について説明している箇所",
+        "法的遵守事項について説明している箇所",
+        "廃棄・リサイクル方法について説明している箇所",
+        "開発ストーリー・コンセプトについて説明している箇所",
+        "生産者・製造工程について説明している箇所",
+        "サステナビリティ・環境配慮について説明している箇所",
+        "受賞歴・メディア掲載について説明している箇所",
+        "ターゲット層（こんな方におすすめ）について説明している箇所",
+        "監修者・専門家のコメントについて説明している箇所",
+        "組み立て・設置方法について説明している箇所",
+        "初期設定（セットアップ）について説明している箇所",
+        "トラブルシューティング（Q&A）について説明している箇所",
+        "アップデート・更新について説明している箇所",
+        "修理・交換対応について説明している箇所",
+        "消耗品の購入・補充について説明している箇所",
+        "返品・キャンセルポリシーについて説明している箇所",
+        "配送・納期について説明している箇所",
+        "カスタマーサポート窓口について説明している箇所"
+    ]
+    
+    # キーワードマッピング（優先クエリとの関連性チェック用）
     keyword_patterns = {
-        "説明": "について説明している箇所",
-        "使い方": "使用方法について説明している箇所",
-        "使用方法": "使用方法について説明している箇所",
-        "メンテナンス": "メンテナンス方法について説明している箇所",
-        "手入れ": "お手入れ方法について説明している箇所",
-        "サイズ": "サイズについて説明している箇所",
-        "価格": "価格について説明している箇所",
+        "商品": "商品の特徴について説明している箇所",
+        "特徴": "商品の特徴について説明している箇所",
+        "デザイン": "デザインについて説明をしている箇所",
+        "使い方": "使用方法について説明をしている箇所",
+        "使用方法": "使用方法について説明をしている箇所",
+        "メンテナンス": "メンテナンス方法について説明をしている箇所",
+        "手入れ": "メンテナンス方法について説明をしている箇所",
+        "保証": "保証について説明をしている箇所",
+        "味": "味・風味について説明している箇所",
+        "風味": "味・風味について説明している箇所",
+        "色": "色味について説明している箇所",
+        "香り": "香りについて説明している箇所",
+        "肌触り": "肌触り・テクスチャーについて説明している箇所",
+        "テクスチャー": "肌触り・テクスチャーについて説明している箇所",
+        "着心地": "着心地・フィット感について説明している箇所",
+        "フィット": "着心地・フィット感について説明している箇所",
+        "使いやすさ": "使いやすさについて説明している箇所",
+        "携帯": "携帯性（持ち運びやすさ）について説明している箇所",
+        "持ち運び": "携帯性（持ち運びやすさ）について説明している箇所",
+        "サイズ": "サイズ・寸法について説明している箇所",
+        "寸法": "サイズ・寸法について説明している箇所",
+        "重量": "重量について説明している箇所",
+        "重さ": "重量について説明している箇所",
+        "原材料": "原材料・素材について説明している箇所",
+        "素材": "原材料・素材について説明している箇所",
+        "成分": "成分・添加物について説明している箇所",
+        "添加物": "成分・添加物について説明している箇所",
+        "アレルギー": "アレルギー物質について説明している箇所",
+        "原産": "原産国・製造国について説明している箇所",
+        "製造": "原産国・製造国について説明している箇所",
+        "カラー": "カラーバリエーションについて説明している箇所",
+        "色": "カラーバリエーションについて説明している箇所",
+        "付属": "付属品・同梱物について説明している箇所",
+        "同梱": "付属品・同梱物について説明している箇所",
+        "消費期限": "製造年月日・消費期限について説明している箇所",
+        "スペック": "スペック・性能について説明している箇所",
+        "性能": "スペック・性能について説明している箇所",
+        "耐久": "耐久性・寿命について説明している箇所",
+        "寿命": "耐久性・寿命について説明している箇所",
+        "防水": "防水・防塵性能について説明している箇所",
+        "防塵": "防水・防塵性能について説明している箇所",
+        "静音": "静音性について説明している箇所",
+        "省エネ": "省エネ性能・消費電力について説明している箇所",
+        "消費電力": "省エネ性能・消費電力について説明している箇所",
+        "注意": "安全上の注意・警告について説明している箇所",
+        "警告": "安全上の注意・警告について説明している箇所",
+        "禁止": "使用禁止事項について説明している箇所",
+        "年齢": "対象年齢について説明している箇所",
+        "副作用": "副作用・リスクについて説明している箇所",
+        "リスク": "副作用・リスクについて説明している箇所",
+        "廃棄": "廃棄・リサイクル方法について説明している箇所",
+        "リサイクル": "廃棄・リサイクル方法について説明している箇所",
+        "ストーリー": "開発ストーリー・コンセプトについて説明している箇所",
+        "コンセプト": "開発ストーリー・コンセプトについて説明している箇所",
+        "組み立て": "組み立て・設置方法について説明している箇所",
+        "設置": "組み立て・設置方法について説明している箇所",
+        "設定": "初期設定（セットアップ）について説明している箇所",
+        "セットアップ": "初期設定（セットアップ）について説明している箇所",
+        "トラブル": "トラブルシューティング（Q&A）について説明している箇所",
+        "修理": "修理・交換対応について説明している箇所",
+        "交換": "修理・交換対応について説明している箇所",
+        "返品": "返品・キャンセルポリシーについて説明している箇所",
+        "キャンセル": "返品・キャンセルポリシーについて説明している箇所",
+        "配送": "配送・納期について説明している箇所",
+        "納期": "配送・納期について説明している箇所",
+        "サポート": "カスタマーサポート窓口について説明している箇所",
+        "問い合わせ": "カスタマーサポート窓口について説明している箇所",
         "料金": "料金について説明している箇所",
         "特徴": "特徴について説明している箇所",
         "機能": "機能について説明している箇所",
@@ -596,15 +715,17 @@ def generate_search_suggestions(transcript_text: str, max_suggestions: int = 10)
         "デメリット": "デメリットについて説明している箇所",
     }
     
-    # 文字起こしテキストから検出
+    # 文字起こしテキストから関連するキーワードを検出
     text_lower = transcript_text.lower()
+    matched_queries = []
     
-    for keyword, suggestion_template in keyword_patterns.items():
-        if keyword in text_lower:
-            suggestions.append(suggestion_template)
+    # キーワードパターンに基づいて優先クエリを抽出
+    for keyword, query in keyword_patterns.items():
+        if keyword in text_lower and query not in matched_queries:
+            matched_queries.append(query)
     
-    # 汎用的な候補を追加
-    if len(suggestions) < 3:
+    # マッチしたクエリが少ない場合、汎用候補を追加
+    if len(matched_queries) < 3:
         generic_suggestions = [
             "重要な説明をしている箇所",
             "詳しく説明している箇所",
@@ -612,19 +733,14 @@ def generate_search_suggestions(transcript_text: str, max_suggestions: int = 10)
             "まとめている箇所",
             "強調している箇所"
         ]
-        suggestions.extend(generic_suggestions)
+        for gen_sug in generic_suggestions:
+            if gen_sug not in matched_queries:
+                matched_queries.append(gen_sug)
+                if len(matched_queries) >= max_suggestions:
+                    break
     
-    # 重複を削除して最大数に制限
-    seen = set()
-    unique_suggestions = []
-    for s in suggestions:
-        if s not in seen:
-            seen.add(s)
-            unique_suggestions.append(s)
-            if len(unique_suggestions) >= max_suggestions:
-                break
-    
-    return unique_suggestions
+    # 最大数に制限
+    return matched_queries[:max_suggestions]
 
 
 def get_video_duration(video_path: str) -> float:
@@ -1580,31 +1696,47 @@ def main():
                         else:
                             background_type = "なし（透明）"
                     elif background_category == "吹き出し風":
-                        background_type = st.selectbox(
-                            "吹き出しデザイン",
+                        # 吹き出しの形状を選択
+                        balloon_shape = st.selectbox(
+                            "吹き出しの形状",
                             [
-                                "💬 楕円吹き出し（白）",
-                                "💬 楕円吹き出し（黒）",
-                                "🗨️ 角丸長方形（白）",
-                                "🗨️ 角丸長方形（黒）",
-                                "☁️ 雲形（白）",
-                                "☁️ 雲形（黒）",
-                                "⭐ 放射線（白）",
-                                "⭐ 放射線（黒）",
-                                "⬛ 角張り長方形（白）",
-                                "⬛ 角張り長方形（黒）",
-                                "💭 考え事（白）",
-                                "💭 考え事（黒）",
-                                "💢 叫び（白）",
-                                "💢 叫び（黒）",
-                                "💥 爆発（黄）",
-                                "💥 爆発（赤）",
-                                "💗 ハート（ピンク）",
-                                "🗨️ 角丸長方形（青）",
-                                "🗨️ 角丸長方形（緑）"
+                                "💬 楕円吹き出し",
+                                "🗨️ 角丸長方形",
+                                "☁️ 雲形",
+                                "⭐ 放射線",
+                                "⬛ 角張り長方形",
+                                "💭 考え事",
+                                "💢 叫び",
+                                "💥 爆発",
+                                "💗 ハート"
                             ],
-                            key="background_select_balloon"
+                            key="balloon_shape_select"
                         )
+                        
+                        # 吹き出しの色を選択
+                        balloon_color_choice = st.radio(
+                            "吹き出しの色",
+                            ["⚪ 白", "⚫ 黒", "🎨 カスタム"],
+                            key="balloon_color_choice",
+                            horizontal=True
+                        )
+                        
+                        # カスタム色の場合、カラーピッカーを表示
+                        if balloon_color_choice == "🎨 カスタム":
+                            custom_balloon_color = st.color_picker(
+                                "吹き出しの色を選択",
+                                "#FFFF00",
+                                key="custom_balloon_color"
+                            )
+                            st.session_state.custom_balloon_color = custom_balloon_color
+                            balloon_color_suffix = f"（カスタム:{custom_balloon_color}）"
+                        elif balloon_color_choice == "⚪ 白":
+                            balloon_color_suffix = "（白）"
+                        else:  # ⚫ 黒
+                            balloon_color_suffix = "（黒）"
+                        
+                        # background_typeを構築
+                        background_type = balloon_shape + balloon_color_suffix
                         
                         # 吹き出し背景のサイズ調整機能を追加
                         st.write("**🔧 吹き出しのサイズ調整**")
@@ -1761,10 +1893,11 @@ def main():
                         auto_position = False
                         auto_size = False
                     
-                    # 位置設定
+                    # テキスト表示位置設定
+                    st.subheader("📍 テキスト表示位置設定")
                     position_mode = st.radio(
                         "位置設定モード",
-                        ["プリセット", "ビジュアル選択", "カスタム（詳細）"],
+                        ["プリセット", "テキスト表示位置選択", "カスタム（詳細）"],
                         key="position_mode",
                         horizontal=True
                     )
@@ -1787,9 +1920,9 @@ def main():
                         }
                         x_pos, y_pos = position_map[position_preset]
                     
-                    elif position_mode == "ビジュアル選択":
-                        st.write("**ビジュアル位置選択**")
-                        st.info("📍 ボタンをクリックして位置を選択してください。")
+                    elif position_mode == "テキスト表示位置選択":
+                        st.write("**テキスト表示位置を選択**")
+                        st.info("📍 ボタンをクリックしてテキストの表示位置を選択してください。")
                         
                         # ボタンで位置を選択（機能しないHTMLグリッドを削除）
                         col1, col2, col3 = st.columns(3)
@@ -1898,6 +2031,94 @@ def main():
                                 )
                         
                         st.write(f"**現在の座標式**: X=`{x_pos}`, Y=`{y_pos}`")
+                    
+                    st.markdown("---")
+                    
+                    # 背景位置選択（吹き出しとカスタム背景の場合のみ表示）
+                    if background_category in ["吹き出し風", "カスタム画像"]:
+                        st.subheader("🎨 背景位置選択")
+                        bg_position_mode = st.radio(
+                            "背景位置設定モード",
+                            ["プリセット", "背景位置選択"],
+                            key="bg_position_mode_telop",
+                            horizontal=True
+                        )
+                        
+                        if bg_position_mode == "プリセット":
+                            bg_position_preset = st.selectbox(
+                                "背景位置",
+                                ["下部中央", "上部中央", "中央", "左下", "右下", "左上", "右上"],
+                                key="bg_position_preset_telop"
+                            )
+                            
+                            bg_position_map = {
+                                "下部中央": ("(main_w-overlay_w)/2", "main_h-overlay_h-80"),
+                                "上部中央": ("(main_w-overlay_w)/2", "20"),
+                                "中央": ("(main_w-overlay_w)/2", "(main_h-overlay_h)/2"),
+                                "左下": ("20", "main_h-overlay_h-20"),
+                                "右下": ("main_w-overlay_w-20", "main_h-overlay_h-20"),
+                                "左上": ("20", "20"),
+                                "右上": ("main_w-overlay_w-20", "20")
+                            }
+                            bg_x_pos, bg_y_pos = bg_position_map[bg_position_preset]
+                        
+                        else:  # 背景位置選択
+                            st.write("**背景位置を選択**")
+                            st.info("📍 ボタンをクリックして背景の配置位置を選択してください。")
+                            
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                if st.button("↖️ 左上", key="bg_pos_tl_telop", use_container_width=True):
+                                    st.session_state.bg_visual_position_telop = "左上"
+                                    st.rerun()
+                                if st.button("⬅️ 左中", key="bg_pos_ml_telop", use_container_width=True):
+                                    st.session_state.bg_visual_position_telop = "左中"
+                                    st.rerun()
+                                if st.button("↙️ 左下", key="bg_pos_bl_telop", use_container_width=True):
+                                    st.session_state.bg_visual_position_telop = "左下"
+                                    st.rerun()
+                            
+                            with col2:
+                                if st.button("⬆️ 上中", key="bg_pos_tc_telop", use_container_width=True):
+                                    st.session_state.bg_visual_position_telop = "上中"
+                                    st.rerun()
+                                if st.button("⏺️ 中央", key="bg_pos_cc_telop", use_container_width=True):
+                                    st.session_state.bg_visual_position_telop = "中央"
+                                    st.rerun()
+                                if st.button("⬇️ 下中", key="bg_pos_bc_telop", use_container_width=True):
+                                    st.session_state.bg_visual_position_telop = "下中"
+                                    st.rerun()
+                            
+                            with col3:
+                                if st.button("↗️ 右上", key="bg_pos_tr_telop", use_container_width=True):
+                                    st.session_state.bg_visual_position_telop = "右上"
+                                    st.rerun()
+                                if st.button("➡️ 右中", key="bg_pos_mr_telop", use_container_width=True):
+                                    st.session_state.bg_visual_position_telop = "右中"
+                                    st.rerun()
+                                if st.button("↘️ 右下", key="bg_pos_br_telop", use_container_width=True):
+                                    st.session_state.bg_visual_position_telop = "右下"
+                                    st.rerun()
+                            
+                            selected_bg_pos = st.session_state.get('bg_visual_position_telop', '下中')
+                            st.success(f"✅ 選択中: **{selected_bg_pos}**")
+                            
+                            bg_visual_position_map = {
+                                "左上": ("20", "20"),
+                                "上中": ("(main_w-overlay_w)/2", "20"),
+                                "右上": ("main_w-overlay_w-20", "20"),
+                                "左中": ("20", "(main_h-overlay_h)/2"),
+                                "中央": ("(main_w-overlay_w)/2", "(main_h-overlay_h)/2"),
+                                "右中": ("main_w-overlay_w-20", "(main_h-overlay_h)/2"),
+                                "左下": ("20", "main_h-overlay_h-20"),
+                                "下中": ("(main_w-overlay_w)/2", "main_h-overlay_h-80"),
+                                "右下": ("main_w-overlay_w-20", "main_h-overlay_h-20")
+                            }
+                            bg_x_pos, bg_y_pos = bg_visual_position_map[selected_bg_pos]
+                        
+                        # セッションステートに保存
+                        st.session_state.telop_bg_x_pos = bg_x_pos
+                        st.session_state.telop_bg_y_pos = bg_y_pos
                     
                     # リアルタイムプレビュー生成ボタン
                     if st.button("🔄 プレビューを更新", key="update_preview"):
