@@ -881,8 +881,9 @@ def generate_final_video_with_subtitle(
             import streamlit as st
             custom_bg_path = st.session_state.get('custom_bg_path')
             bg_scale = st.session_state.get('bg_scale', 1.0)
-            bg_x_pos = st.session_state.get('bg_x_pos', '(main_w-overlay_w)/2')
-            bg_y_pos = st.session_state.get('bg_y_pos', 'main_h-overlay_h-80')
+            # テロップ編集で設定された位置を優先使用
+            bg_x_pos = st.session_state.get('telop_bg_x_pos', st.session_state.get('bg_x_pos', '(main_w-overlay_w)/2'))
+            bg_y_pos = st.session_state.get('telop_bg_y_pos', st.session_state.get('bg_y_pos', 'main_h-overlay_h-80'))
             text_scale = st.session_state.get('text_scale', 1.0)
             
             if custom_bg_path and Path(custom_bg_path).exists():
@@ -940,11 +941,15 @@ def generate_final_video_with_subtitle(
             if balloon_scale != 1.0:
                 balloon_stream = balloon_stream.filter('scale', f'iw*{balloon_scale}', f'ih*{balloon_scale}')
             
-            # 吹き出し画像を動画に重ねる（固定位置: 下部中央）
+            # 背景位置をセッションステートから取得（ユーザー選択を反映）
+            balloon_x_pos = st.session_state.get('telop_bg_x_pos', '(main_w-overlay_w)/2')
+            balloon_y_pos = st.session_state.get('telop_bg_y_pos', 'main_h-overlay_h-80')
+            
+            # 吹き出し画像を動画に重ねる（ユーザー指定位置）
             video_stream = video_stream.overlay(
                 balloon_stream,
-                x='(main_w-overlay_w)/2',  # 中央配置
-                y='main_h-overlay_h-80',   # 下から80px
+                x=balloon_x_pos,
+                y=balloon_y_pos,
                 format='auto'
             )
             
@@ -1634,6 +1639,147 @@ def main():
                     
                     st.markdown("---")
                     
+                    # テキスト表示位置設定（背景デザインの前に移動）
+                    st.subheader("📍 テキスト表示位置設定")
+                    position_mode = st.radio(
+                        "位置設定モード",
+                        ["プリセット", "テキスト表示位置選択", "カスタム（詳細）"],
+                        key="position_mode",
+                        horizontal=True
+                    )
+                    
+                    if position_mode == "プリセット":
+                        position_preset = st.selectbox(
+                            "テロップ位置",
+                            ["下部中央", "上部中央", "中央", "左下", "右下", "左上", "右上"],
+                            key="position_select"
+                        )
+                        
+                        position_map = {
+                            "下部中央": ("(w-text_w)/2", "h-text_h-20"),
+                            "上部中央": ("(w-text_w)/2", "20"),
+                            "中央": ("(w-text_w)/2", "(h-text_h)/2"),
+                            "左下": ("20", "h-text_h-20"),
+                            "右下": ("w-text_w-20", "h-text_h-20"),
+                            "左上": ("20", "20"),
+                            "右上": ("w-text_w-20", "20")
+                        }
+                        x_pos, y_pos = position_map[position_preset]
+                    
+                    elif position_mode == "テキスト表示位置選択":
+                        st.write("**テキスト表示位置を選択**")
+                        st.info("📍 ボタンをクリックしてテキストの表示位置を選択してください。")
+                        
+                        # ボタンで位置を選択
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            if st.button("↖️ 左上", key="pos_tl", use_container_width=True):
+                                st.session_state.visual_position = "左上"
+                                st.rerun()
+                            if st.button("⬅️ 左中", key="pos_ml", use_container_width=True):
+                                st.session_state.visual_position = "左中"
+                                st.rerun()
+                            if st.button("↙️ 左下", key="pos_bl", use_container_width=True):
+                                st.session_state.visual_position = "左下"
+                                st.rerun()
+                        
+                        with col2:
+                            if st.button("⬆️ 上中", key="pos_tc", use_container_width=True):
+                                st.session_state.visual_position = "上中"
+                                st.rerun()
+                            if st.button("⏺️ 中央", key="pos_cc", use_container_width=True):
+                                st.session_state.visual_position = "中央"
+                                st.rerun()
+                            if st.button("⬇️ 下中", key="pos_bc", use_container_width=True):
+                                st.session_state.visual_position = "下中"
+                                st.rerun()
+                        
+                        with col3:
+                            if st.button("↗️ 右上", key="pos_tr", use_container_width=True):
+                                st.session_state.visual_position = "右上"
+                                st.rerun()
+                            if st.button("➡️ 右中", key="pos_mr", use_container_width=True):
+                                st.session_state.visual_position = "右中"
+                                st.rerun()
+                            if st.button("↘️ 右下", key="pos_br", use_container_width=True):
+                                st.session_state.visual_position = "右下"
+                                st.rerun()
+                        
+                        # 選択された位置を表示
+                        selected_pos = st.session_state.get('visual_position', '下中')
+                        st.success(f"✅ 選択中: **{selected_pos}**")
+                        
+                        # 位置マッピング（9分割）
+                        visual_position_map = {
+                            "左上": ("20", "20"),
+                            "上中": ("(w-text_w)/2", "20"),
+                            "右上": ("w-text_w-20", "20"),
+                            "左中": ("20", "(h-text_h)/2"),
+                            "中央": ("(w-text_w)/2", "(h-text_h)/2"),
+                            "右中": ("w-text_w-20", "(h-text_h)/2"),
+                            "左下": ("20", "h-text_h-20"),
+                            "下中": ("(w-text_w)/2", "h-text_h-20"),
+                            "右下": ("w-text_w-20", "h-text_h-20")
+                        }
+                        x_pos, y_pos = visual_position_map[selected_pos]
+                    
+                    else:
+                        # カスタム位置設定
+                        st.write("**カスタム位置設定**")
+                        st.info("💡 座標は動画サイズに対する相対値です。(w=動画幅, h=動画高さ, text_w=テキスト幅, text_h=テキスト高さ)")
+                        
+                        col_x, col_y = st.columns(2)
+                        
+                        with col_x:
+                            x_pos_type = st.selectbox(
+                                "X位置の基準",
+                                ["左端からの距離", "中央揃え", "右端からの距離", "カスタム式"],
+                                key="x_pos_type"
+                            )
+                            
+                            if x_pos_type == "左端からの距離":
+                                x_offset = st.number_input("左端からのピクセル数", 0, 1000, 20, key="x_offset")
+                                x_pos = str(x_offset)
+                            elif x_pos_type == "中央揃え":
+                                x_pos = "(w-text_w)/2"
+                            elif x_pos_type == "右端からの距離":
+                                x_offset = st.number_input("右端からのピクセル数", 0, 1000, 20, key="x_offset_right")
+                                x_pos = f"w-text_w-{x_offset}"
+                            else:
+                                x_pos = st.text_input(
+                                    "X位置の式",
+                                    "(w-text_w)/2",
+                                    key="x_pos_custom",
+                                    help="例: (w-text_w)/2 (中央), 50 (左から50px), w-text_w-50 (右から50px)"
+                                )
+                        
+                        with col_y:
+                            y_pos_type = st.selectbox(
+                                "Y位置の基準",
+                                ["上端からの距離", "中央揃え", "下端からの距離", "カスタム式"],
+                                key="y_pos_type"
+                            )
+                            
+                            if y_pos_type == "上端からの距離":
+                                y_offset = st.number_input("上端からのピクセル数", 0, 1000, 20, key="y_offset")
+                                y_pos = str(y_offset)
+                            elif y_pos_type == "中央揃え":
+                                y_pos = "(h-text_h)/2"
+                            elif y_pos_type == "下端からの距離":
+                                y_offset = st.number_input("下端からのピクセル数", 0, 1000, 20, key="y_offset_bottom")
+                                y_pos = f"h-text_h-{y_offset}"
+                            else:
+                                y_pos = st.text_input(
+                                    "Y位置の式",
+                                    "h-text_h-20",
+                                    key="y_pos_custom",
+                                    help="例: (h-text_h)/2 (中央), 50 (上から50px), h-text_h-50 (下から50px)"
+                                )
+                        
+                        st.write(f"**現在の座標式**: X=`{x_pos}`, Y=`{y_pos}`")
+                    
+                    st.markdown("---")
+                    
                     # 背景デザイン（先に定義）
                     background_category = st.radio(
                         "背景カテゴリ",
@@ -1713,24 +1859,16 @@ def main():
                             key="balloon_shape_select"
                         )
                         
-                        # 吹き出しの色を選択
+                        # 吹き出しの色を選択（白と黒のみ）
                         balloon_color_choice = st.radio(
                             "吹き出しの色",
-                            ["⚪ 白", "⚫ 黒", "🎨 カスタム"],
+                            ["⚪ 白", "⚫ 黒"],
                             key="balloon_color_choice",
                             horizontal=True
                         )
                         
-                        # カスタム色の場合、カラーピッカーを表示
-                        if balloon_color_choice == "🎨 カスタム":
-                            custom_balloon_color = st.color_picker(
-                                "吹き出しの色を選択",
-                                "#FFFF00",
-                                key="custom_balloon_color"
-                            )
-                            st.session_state.custom_balloon_color = custom_balloon_color
-                            balloon_color_suffix = f"（カスタム:{custom_balloon_color}）"
-                        elif balloon_color_choice == "⚪ 白":
+                        # 色に応じてサフィックスを設定
+                        if balloon_color_choice == "⚪ 白":
                             balloon_color_suffix = "（白）"
                         else:  # ⚫ 黒
                             balloon_color_suffix = "（黒）"
@@ -1893,147 +2031,6 @@ def main():
                         auto_position = False
                         auto_size = False
                     
-                    # テキスト表示位置設定
-                    st.subheader("📍 テキスト表示位置設定")
-                    position_mode = st.radio(
-                        "位置設定モード",
-                        ["プリセット", "テキスト表示位置選択", "カスタム（詳細）"],
-                        key="position_mode",
-                        horizontal=True
-                    )
-                    
-                    if position_mode == "プリセット":
-                        position_preset = st.selectbox(
-                            "テロップ位置",
-                            ["下部中央", "上部中央", "中央", "左下", "右下", "左上", "右上"],
-                            key="position_select"
-                        )
-                        
-                        position_map = {
-                            "下部中央": ("(w-text_w)/2", "h-text_h-20"),
-                            "上部中央": ("(w-text_w)/2", "20"),
-                            "中央": ("(w-text_w)/2", "(h-text_h)/2"),
-                            "左下": ("20", "h-text_h-20"),
-                            "右下": ("w-text_w-20", "h-text_h-20"),
-                            "左上": ("20", "20"),
-                            "右上": ("w-text_w-20", "20")
-                        }
-                        x_pos, y_pos = position_map[position_preset]
-                    
-                    elif position_mode == "テキスト表示位置選択":
-                        st.write("**テキスト表示位置を選択**")
-                        st.info("📍 ボタンをクリックしてテキストの表示位置を選択してください。")
-                        
-                        # ボタンで位置を選択（機能しないHTMLグリッドを削除）
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            if st.button("↖️ 左上", key="pos_tl", use_container_width=True):
-                                st.session_state.visual_position = "左上"
-                                st.rerun()
-                            if st.button("⬅️ 左中", key="pos_ml", use_container_width=True):
-                                st.session_state.visual_position = "左中"
-                                st.rerun()
-                            if st.button("↙️ 左下", key="pos_bl", use_container_width=True):
-                                st.session_state.visual_position = "左下"
-                                st.rerun()
-                        
-                        with col2:
-                            if st.button("⬆️ 上中", key="pos_tc", use_container_width=True):
-                                st.session_state.visual_position = "上中"
-                                st.rerun()
-                            if st.button("⏺️ 中央", key="pos_cc", use_container_width=True):
-                                st.session_state.visual_position = "中央"
-                                st.rerun()
-                            if st.button("⬇️ 下中", key="pos_bc", use_container_width=True):
-                                st.session_state.visual_position = "下中"
-                                st.rerun()
-                        
-                        with col3:
-                            if st.button("↗️ 右上", key="pos_tr", use_container_width=True):
-                                st.session_state.visual_position = "右上"
-                                st.rerun()
-                            if st.button("➡️ 右中", key="pos_mr", use_container_width=True):
-                                st.session_state.visual_position = "右中"
-                                st.rerun()
-                            if st.button("↘️ 右下", key="pos_br", use_container_width=True):
-                                st.session_state.visual_position = "右下"
-                                st.rerun()
-                        
-                        # 選択された位置を表示
-                        selected_pos = st.session_state.get('visual_position', '下中')
-                        st.success(f"✅ 選択中: **{selected_pos}**")
-                        
-                        # 位置マッピング（9分割）
-                        visual_position_map = {
-                            "左上": ("20", "20"),
-                            "上中": ("(w-text_w)/2", "20"),
-                            "右上": ("w-text_w-20", "20"),
-                            "左中": ("20", "(h-text_h)/2"),
-                            "中央": ("(w-text_w)/2", "(h-text_h)/2"),
-                            "右中": ("w-text_w-20", "(h-text_h)/2"),
-                            "左下": ("20", "h-text_h-20"),
-                            "下中": ("(w-text_w)/2", "h-text_h-20"),
-                            "右下": ("w-text_w-20", "h-text_h-20")
-                        }
-                        x_pos, y_pos = visual_position_map[selected_pos]
-                    
-                    else:
-                        # カスタム位置設定
-                        st.write("**カスタム位置設定**")
-                        st.info("💡 座標は動画サイズに対する相対値です。(w=動画幅, h=動画高さ, text_w=テキスト幅, text_h=テキスト高さ)")
-                        
-                        col_x, col_y = st.columns(2)
-                        
-                        with col_x:
-                            x_pos_type = st.selectbox(
-                                "X位置の基準",
-                                ["左端からの距離", "中央揃え", "右端からの距離", "カスタム式"],
-                                key="x_pos_type"
-                            )
-                            
-                            if x_pos_type == "左端からの距離":
-                                x_offset = st.number_input("左端からのピクセル数", 0, 1000, 20, key="x_offset")
-                                x_pos = str(x_offset)
-                            elif x_pos_type == "中央揃え":
-                                x_pos = "(w-text_w)/2"
-                            elif x_pos_type == "右端からの距離":
-                                x_offset = st.number_input("右端からのピクセル数", 0, 1000, 20, key="x_offset_right")
-                                x_pos = f"w-text_w-{x_offset}"
-                            else:
-                                x_pos = st.text_input(
-                                    "X位置の式",
-                                    "(w-text_w)/2",
-                                    key="x_pos_custom",
-                                    help="例: (w-text_w)/2 (中央), 50 (左から50px), w-text_w-50 (右から50px)"
-                                )
-                        
-                        with col_y:
-                            y_pos_type = st.selectbox(
-                                "Y位置の基準",
-                                ["上端からの距離", "中央揃え", "下端からの距離", "カスタム式"],
-                                key="y_pos_type"
-                            )
-                            
-                            if y_pos_type == "上端からの距離":
-                                y_offset = st.number_input("上端からのピクセル数", 0, 1000, 20, key="y_offset")
-                                y_pos = str(y_offset)
-                            elif y_pos_type == "中央揃え":
-                                y_pos = "(h-text_h)/2"
-                            elif y_pos_type == "下端からの距離":
-                                y_offset = st.number_input("下端からのピクセル数", 0, 1000, 20, key="y_offset_bottom")
-                                y_pos = f"h-text_h-{y_offset}"
-                            else:
-                                y_pos = st.text_input(
-                                    "Y位置の式",
-                                    "h-text_h-20",
-                                    key="y_pos_custom",
-                                    help="例: (h-text_h)/2 (中央), 50 (上から50px), h-text_h-50 (下から50px)"
-                                )
-                        
-                        st.write(f"**現在の座標式**: X=`{x_pos}`, Y=`{y_pos}`")
-                    
-                    st.markdown("---")
-                    
                     # 背景位置選択（吹き出しとカスタム背景の場合のみ表示）
                     if background_category in ["吹き出し風", "カスタム画像"]:
                         st.subheader("🎨 背景位置選択")
@@ -2147,13 +2144,14 @@ def main():
                             st.warning("テロップテキストを入力してください。")
                 
                 with col_preview:
-                    # リアルタイムプレビュー表示（小さいサイズ）
+                    # リアルタイムプレビュー表示（スクロール追従する浮遊プレビュー）
                     st.subheader("🎬 プレビュー")
                     
-                    # CSSで動画サイズを小さくする
+                    # CSSで動画サイズを小さくし、スクロール追従を追加
                     st.markdown(
                         """
                         <style>
+                        /* プレビュー動画のサイズ調整 */
                         [data-testid="stVideo"] {
                             max-width: 400px !important;
                             margin: 0 auto;
@@ -2161,6 +2159,14 @@ def main():
                         [data-testid="stVideo"] video {
                             max-width: 100% !important;
                             height: auto !important;
+                        }
+                        
+                        /* プレビューカラムをスクロール追従させる（PIP風） */
+                        div[data-testid="column"]:has(> div > div > div > [data-testid="stVideo"]) {
+                            position: sticky !important;
+                            top: 20px !important;
+                            align-self: flex-start !important;
+                            z-index: 100 !important;
                         }
                         </style>
                         """,
