@@ -697,7 +697,10 @@ def get_background_settings(background_type: str):
     }
     
     # 該当する背景を検索
-    if background_type in simple_backgrounds:
+    if background_type == "custom":
+        # カスタム背景画像モード
+        return {'mode': 'custom', 'balloon_image': None, 'box': 0, 'boxcolor': "black@0.0", 'boxborderw': 0}
+    elif background_type in simple_backgrounds:
         return simple_backgrounds[background_type]
     elif background_type in balloon_backgrounds:
         return balloon_backgrounds[background_type]
@@ -739,8 +742,60 @@ def generate_final_video_with_subtitle(
         input_stream = ffmpeg.input(video_path, ss=start_time, to=end_time)
         video_stream = input_stream.video
         
+        # カスタム背景画像モードの場合
+        if bg_settings['mode'] == 'custom':
+            # セッションステートからカスタム背景情報を取得
+            import streamlit as st
+            custom_bg_path = st.session_state.get('custom_bg_path')
+            bg_scale = st.session_state.get('bg_scale', 1.0)
+            bg_x_pos = st.session_state.get('bg_x_pos', '(main_w-overlay_w)/2')
+            bg_y_pos = st.session_state.get('bg_y_pos', 'main_h-overlay_h-80')
+            text_scale = st.session_state.get('text_scale', 1.0)
+            
+            if custom_bg_path and Path(custom_bg_path).exists():
+                custom_bg_path = str(Path(custom_bg_path).absolute()).replace("\\", "/")
+                
+                # カスタム背景画像を読み込み、スケール調整
+                bg_stream = ffmpeg.input(custom_bg_path)
+                if bg_scale != 1.0:
+                    bg_stream = bg_stream.filter('scale', f'iw*{bg_scale}', f'ih*{bg_scale}')
+                
+                # 背景画像を動画に重ねる
+                video_stream = video_stream.overlay(
+                    bg_stream,
+                    x=bg_x_pos,
+                    y=bg_y_pos,
+                    format='auto'
+                )
+                
+                # テキストスケールを適用したフォントサイズ
+                adjusted_font_size = int(font_size * text_scale)
+                
+                # テキストを描画（ユーザー指定の位置）
+                video_stream = video_stream.filter(
+                    'drawtext',
+                    text=escaped_text,
+                    fontfile=font_path,
+                    fontsize=adjusted_font_size,
+                    fontcolor=font_color,
+                    x=x_position,
+                    y=y_position
+                )
+            else:
+                # カスタム背景が見つからない場合は透明背景として処理
+                adjusted_font_size = int(font_size * st.session_state.get('text_scale', 1.0))
+                video_stream = video_stream.filter(
+                    'drawtext',
+                    text=escaped_text,
+                    fontfile=font_path,
+                    fontsize=adjusted_font_size,
+                    fontcolor=font_color,
+                    x=x_position,
+                    y=y_position
+                )
+        
         # 吹き出し画像モードの場合
-        if bg_settings['mode'] == 'balloon' and bg_settings['balloon_image']:
+        elif bg_settings['mode'] == 'balloon' and bg_settings['balloon_image']:
             balloon_path = str(Path(bg_settings['balloon_image']).absolute()).replace("\\", "/")
             
             # 吹き出し画像をオーバーレイ（動画の下部中央に配置）
@@ -771,6 +826,11 @@ def generate_final_video_with_subtitle(
             else:
                 adjusted_font_size = font_size
             
+            # テキストスケールも適用
+            import streamlit as st
+            text_scale = st.session_state.get('text_scale', 1.0)
+            adjusted_font_size = int(adjusted_font_size * text_scale)
+            
             # テキストを描画
             video_stream = video_stream.filter(
                 'drawtext',
@@ -783,12 +843,17 @@ def generate_final_video_with_subtitle(
             )
         # シンプル背景モード
         else:
+            # テキストスケールを適用
+            import streamlit as st
+            text_scale = st.session_state.get('text_scale', 1.0)
+            adjusted_font_size = int(font_size * text_scale)
+            
             if bg_settings['box'] > 0:
                 video_stream = video_stream.filter(
                     'drawtext',
                     text=escaped_text,
                     fontfile=font_path,
-                    fontsize=font_size,
+                    fontsize=adjusted_font_size,
                     fontcolor=font_color,
                     x=x_position,
                     y=y_position,
@@ -801,7 +866,7 @@ def generate_final_video_with_subtitle(
                     'drawtext',
                     text=escaped_text,
                     fontfile=font_path,
-                    fontsize=font_size,
+                    fontsize=adjusted_font_size,
                     fontcolor=font_color,
                     x=x_position,
                     y=y_position
@@ -1418,6 +1483,18 @@ def main():
                     
                     # フォントサイズ
                     font_size = st.slider("フォントサイズ", 24, 120, 48, key="font_size_slider")
+                    
+                    # テキストスケール調整（追加の拡大縮小機能）
+                    text_scale = st.slider(
+                        "📏 テキストスケール（%）",
+                        min_value=50,
+                        max_value=200,
+                        value=100,
+                        step=5,
+                        key="text_scale_slider",
+                        help="フォントサイズをさらに拡大・縮小します（100%=デフォルト）"
+                    )
+                    st.session_state.text_scale = text_scale / 100.0
                     
                     # 文字色
                     font_color = st.color_picker("文字色", "#FFFFFF", key="font_color_picker")
