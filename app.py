@@ -471,7 +471,11 @@ def create_preview_clip(video_path: str, start_time: float, end_time: float, out
 
 
 def get_background_settings(background_type: str) -> Tuple[int, str, int]:
-    """背景タイプから設定を取得"""
+    """背景タイプから設定を取得
+    
+    Returns:
+        (box, boxcolor, boxborderw)
+    """
     # シンプル背景
     simple_backgrounds = {
         "なし（透明）": (0, "black@0.0", 0),
@@ -485,26 +489,43 @@ def get_background_settings(background_type: str) -> Tuple[int, str, int]:
         "緑（半透明）": (1, "green@0.7", 5),
     }
     
-    # 吹き出し風背景（すべて角丸+padding大きめで表現）
+    # 吹き出し風背景（角丸の大きさと色で差別化）
     balloon_backgrounds = {
-        "💬 楕円吹き出し（白）": (1, "white@0.95", 15),
-        "💬 楕円吹き出し（黒）": (1, "black@0.85", 15),
-        "🎈 風船吹き出し（白）": (1, "white@0.95", 20),
-        "🎈 風船吹き出し（黒）": (1, "black@0.85", 20),
-        "🗨️ 角丸長方形（白）": (1, "white@0.95", 12),
-        "🗨️ 角丸長方形（黒）": (1, "black@0.85", 12),
-        "⬛ 角張り長方形（白）": (1, "white@0.95", 2),
-        "⬛ 角張り長方形（黒）": (1, "black@0.85", 2),
-        "💍 ダイア形（白）": (1, "white@0.95", 8),
-        "💍 ダイア形（黒）": (1, "black@0.85", 8),
-        "⬣ 六角形（白）": (1, "white@0.95", 10),
-        "⬣ 六角形（黒）": (1, "black@0.85", 10),
-        "☁️ 雲形（白）": (1, "white@0.95", 18),
-        "☁️ 雲形（黒）": (1, "black@0.85", 18),
-        "💥 爆発形（白）": (1, "white@0.95", 25),
-        "💥 爆発形（黒）": (1, "black@0.85", 25),
-        "⭐ 放射線（白）": (1, "white@0.95", 30),
-        "⭐ 放射線（黒）": (1, "black@0.85", 30),
+        # 楕円系 - 大きめの角丸で楕円感を出す
+        "💬 楕円吹き出し（白）": (1, "white@0.98", 25),
+        "💬 楕円吹き出し（黒）": (1, "black@0.90", 25),
+        
+        # 風船系 - 最大の角丸でふんわり感
+        "🎈 風船吹き出し（白）": (1, "white@0.98", 35),
+        "🎈 風船吹き出し（黒）": (1, "black@0.90", 35),
+        
+        # 角丸長方形 - 標準的な角丸
+        "🗨️ 角丸長方形（白）": (1, "white@0.98", 15),
+        "🗨️ 角丸長方形（黒）": (1, "black@0.90", 15),
+        
+        # 角張り - 最小の角丸
+        "⬛ 角張り長方形（白）": (1, "white@0.98", 3),
+        "⬛ 角張り長方形（黒）": (1, "black@0.90", 3),
+        
+        # ダイア形 - 中程度の角丸
+        "💍 ダイア形（白）": (1, "white@0.98", 18),
+        "💍 ダイア形（黒）": (1, "black@0.90", 18),
+        
+        # 六角形 - やや大きめの角丸
+        "⬣ 六角形（白）": (1, "white@0.98", 22),
+        "⬣ 六角形（黒）": (1, "black@0.90", 22),
+        
+        # 雲形 - 大きめの角丸でふわふわ感
+        "☁️ 雲形（白）": (1, "white@0.98", 30),
+        "☁️ 雲形（黒）": (1, "black@0.90", 30),
+        
+        # 爆発形 - 非常に大きな角丸でインパクト
+        "💥 爆発形（白）": (1, "yellow@0.95", 40),  # 黄色で爆発感
+        "💥 爆発形（黒）": (1, "red@0.85", 40),     # 赤で爆発感
+        
+        # 放射線 - 最大の角丸
+        "⭐ 放射線（白）": (1, "yellow@0.95", 45),  # 黄色で放射感
+        "⭐ 放射線（黒）": (1, "orange@0.85", 45),  # オレンジで放射感
     }
     
     # 該当する背景を検索
@@ -1333,29 +1354,92 @@ def main():
         st.info("👈 サイドバーから動画を取得し、文字起こしを実行してください。")
     
     # シーンプレビューのダイアログ（ポップアップ）
-    @st.dialog("🎬 シーンプレビュー", width="small")
+    @st.dialog("🎬 シーンプレビュー & 範囲調整", width="large")
     def show_scene_preview_dialog():
         if 'current_scene_preview_path' in st.session_state:
             st.write(f"**シーン {st.session_state.preview_scene_id}**")
-            st.write(f"⏱️ {st.session_state.preview_scene_start:.2f}秒 - {st.session_state.preview_scene_end:.2f}秒")
             
             if 'preview_scene_text' in st.session_state:
                 st.info(f"💬 {st.session_state.preview_scene_text}")
             
-            # 小さいサイズでプレビュー表示（自動ループ）
+            # 範囲調整スライダー
+            st.subheader("🎯 範囲調整")
+            
+            # 初期値を取得
+            if 'dialog_adjusted_start' not in st.session_state:
+                st.session_state.dialog_adjusted_start = st.session_state.preview_scene_start
+            if 'dialog_adjusted_end' not in st.session_state:
+                st.session_state.dialog_adjusted_end = st.session_state.preview_scene_end
+            
+            # 動画の全体長さを取得
+            video_duration = st.session_state.get('video_duration', 100.0)
+            
+            # 範囲調整スライダー
+            time_range = st.slider(
+                "開始・終了時間を調整",
+                0.0,
+                video_duration,
+                (st.session_state.dialog_adjusted_start, st.session_state.dialog_adjusted_end),
+                step=0.1,
+                key="dialog_time_slider"
+            )
+            
+            adjusted_start, adjusted_end = time_range
+            
+            # 調整後の時間を表示
+            col_time1, col_time2, col_time3 = st.columns(3)
+            with col_time1:
+                st.metric("開始", f"{adjusted_start:.2f}秒")
+            with col_time2:
+                st.metric("終了", f"{adjusted_end:.2f}秒")
+            with col_time3:
+                st.metric("長さ", f"{adjusted_end - adjusted_start:.2f}秒")
+            
+            # 範囲が変更されたらプレビューを更新
+            if (adjusted_start != st.session_state.dialog_adjusted_start or 
+                adjusted_end != st.session_state.dialog_adjusted_end):
+                
+                if st.button("🔄 この範囲でプレビューを更新", use_container_width=True):
+                    with st.spinner("プレビューを生成中..."):
+                        preview_path = str(TEMP_VIDEOS_DIR / f"scene_preview_{st.session_state.preview_scene_id}_adjusted.mp4")
+                        if create_preview_clip(
+                            st.session_state.video_path,
+                            adjusted_start,
+                            adjusted_end,
+                            preview_path
+                        ):
+                            st.session_state.current_scene_preview_path = preview_path
+                            st.session_state.dialog_adjusted_start = adjusted_start
+                            st.session_state.dialog_adjusted_end = adjusted_end
+                            st.rerun()
+            
+            # プレビュー動画を表示
+            st.subheader("📹 プレビュー")
             st.video(st.session_state.current_scene_preview_path, loop=True)
             
+            # ボタン
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("✖️ 閉じる", use_container_width=True, key="close_dialog"):
                     st.session_state.scene_preview_dialog_open = False
+                    # 調整値をリセット
+                    if 'dialog_adjusted_start' in st.session_state:
+                        del st.session_state.dialog_adjusted_start
+                    if 'dialog_adjusted_end' in st.session_state:
+                        del st.session_state.dialog_adjusted_end
                     st.rerun()
             with col2:
-                if st.button("✅ このシーンを選択", use_container_width=True, key="select_from_dialog"):
-                    st.session_state.selected_start = st.session_state.preview_scene_start
-                    st.session_state.selected_end = st.session_state.preview_scene_end
+                if st.button("✅ この範囲で選択", use_container_width=True, key="select_from_dialog"):
+                    # 調整後の値を選択
+                    st.session_state.selected_start = st.session_state.dialog_adjusted_start
+                    st.session_state.selected_end = st.session_state.dialog_adjusted_end
                     st.session_state.scene_preview_dialog_open = False
                     st.session_state.scene_selected = True
+                    # 調整値をリセット
+                    if 'dialog_adjusted_start' in st.session_state:
+                        del st.session_state.dialog_adjusted_start
+                    if 'dialog_adjusted_end' in st.session_state:
+                        del st.session_state.dialog_adjusted_end
                     st.rerun()
     
     # ダイアログを表示
