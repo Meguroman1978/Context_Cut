@@ -798,8 +798,14 @@ def generate_final_video_with_subtitle(
         elif bg_settings['mode'] == 'balloon' and bg_settings['balloon_image']:
             balloon_path = str(Path(bg_settings['balloon_image']).absolute()).replace("\\", "/")
             
-            # 吹き出し画像をオーバーレイ（動画の下部中央に配置）
+            # 吹き出し画像を読み込み
             balloon_stream = ffmpeg.input(balloon_path)
+            
+            # 吹き出しのスケール調整を適用
+            import streamlit as st
+            balloon_scale = st.session_state.get('balloon_scale', 1.0)
+            if balloon_scale != 1.0:
+                balloon_stream = balloon_stream.filter('scale', f'iw*{balloon_scale}', f'ih*{balloon_scale}')
             
             # 吹き出し画像を動画に重ねる（固定位置: 下部中央）
             video_stream = video_stream.overlay(
@@ -1201,13 +1207,15 @@ def main():
                 st.warning("⚠️ 文字起こしがスキップされたため、シーン検索機能は使用できません。")
                 st.info("💡 シーン検索を使用する場合は、サイドバーから「文字起こしを実行」を行ってください。\n\nまたは、「✂️ カット範囲指定」タブで手動で範囲を指定してください。")
             else:
-                # 検索クエリ候補がクリックされた場合の初期値
-                default_query = st.session_state.get('selected_suggestion', '')
+                # 検索クエリ候補がクリックされた場合、それを入力欄に設定
+                if 'selected_suggestion' in st.session_state:
+                    # セッションステートに直接設定することで、text_inputに反映される
+                    st.session_state.search_query_input = st.session_state.selected_suggestion
+                    del st.session_state.selected_suggestion
                 
                 search_query = st.text_input(
                     "検索クエリを入力",
-                    value=default_query,
-                    placeholder="例: 面白いシーン, 感動的な場面, 商品の説明",
+                    placeholder="例: 商品の特徴に関して説明している箇所、商品のメンテナンス方法に関して説明している箇所",
                     key="search_query_input"
                 )
                 
@@ -1232,19 +1240,11 @@ def main():
                                     key=f"suggestion_{idx}",
                                     use_container_width=True
                                 ):
-                                    # クリックされた候補を保存し、search_queryに直接設定
+                                    # クリックされた候補を保存してリロード
                                     st.session_state.selected_suggestion = suggestion
-                                    # 検索クエリ入力欄をクリアして再読み込み
-                                    if 'search_query_input' in st.session_state:
-                                        del st.session_state.search_query_input
                                     st.rerun()
                         
                         st.markdown("---")
-                
-                # 検索実行後は選択された候補をクリア
-                if 'selected_suggestion' in st.session_state and search_query:
-                    if search_query == st.session_state.selected_suggestion:
-                        del st.session_state.selected_suggestion
                 
                 n_results = st.slider("検索結果数", 1, 10, 5)
                 
@@ -1568,6 +1568,26 @@ def main():
                             ],
                             key="background_select_balloon"
                         )
+                        
+                        # 吹き出し背景のサイズ調整機能を追加
+                        st.write("**🔧 吹き出しのサイズ調整**")
+                        balloon_scale = st.slider(
+                            "🎈 吹き出しサイズ（%）",
+                            min_value=30,
+                            max_value=200,
+                            value=100,
+                            step=5,
+                            key="balloon_scale_slider",
+                            help="吹き出し背景の大きさを調整します。マウスでスライダーをドラッグしてください。"
+                        )
+                        st.session_state.balloon_scale = balloon_scale / 100.0
+                        
+                        # プレビュー用のサイズ表示
+                        if balloon_scale != 100:
+                            if balloon_scale < 100:
+                                st.info(f"📉 元のサイズの{balloon_scale}%に縮小されます")
+                            else:
+                                st.info(f"📈 元のサイズの{balloon_scale}%に拡大されます")
                     else:  # カスタム画像
                         st.write("**📤 カスタム背景画像をアップロード**")
                         custom_bg_file = st.file_uploader(
@@ -1631,24 +1651,33 @@ def main():
                                 with col1:
                                     if st.button("↖️ 左上", key="bg_pos_tl", use_container_width=True):
                                         st.session_state.bg_visual_position = "左上"
+                                        st.rerun()
                                     if st.button("⬅️ 左中", key="bg_pos_ml", use_container_width=True):
                                         st.session_state.bg_visual_position = "左中"
+                                        st.rerun()
                                     if st.button("↙️ 左下", key="bg_pos_bl", use_container_width=True):
                                         st.session_state.bg_visual_position = "左下"
+                                        st.rerun()
                                 with col2:
                                     if st.button("⬆️ 上中", key="bg_pos_tc", use_container_width=True):
                                         st.session_state.bg_visual_position = "上中"
+                                        st.rerun()
                                     if st.button("⏺️ 中央", key="bg_pos_cc", use_container_width=True):
                                         st.session_state.bg_visual_position = "中央"
+                                        st.rerun()
                                     if st.button("⬇️ 下中", key="bg_pos_bc", use_container_width=True):
                                         st.session_state.bg_visual_position = "下中"
+                                        st.rerun()
                                 with col3:
                                     if st.button("↗️ 右上", key="bg_pos_tr", use_container_width=True):
                                         st.session_state.bg_visual_position = "右上"
+                                        st.rerun()
                                     if st.button("➡️ 右中", key="bg_pos_mr", use_container_width=True):
                                         st.session_state.bg_visual_position = "右中"
+                                        st.rerun()
                                     if st.button("↘️ 右下", key="bg_pos_br", use_container_width=True):
                                         st.session_state.bg_visual_position = "右下"
+                                        st.rerun()
                                 
                                 selected_bg_pos = st.session_state.get('bg_visual_position', '下中')
                                 st.success(f"✅ 選択中: **{selected_bg_pos}**")
@@ -1709,26 +1738,35 @@ def main():
                         with col1:
                             if st.button("↖️ 左上", key="pos_tl", use_container_width=True):
                                 st.session_state.visual_position = "左上"
+                                st.rerun()
                             if st.button("⬅️ 左中", key="pos_ml", use_container_width=True):
                                 st.session_state.visual_position = "左中"
+                                st.rerun()
                             if st.button("↙️ 左下", key="pos_bl", use_container_width=True):
                                 st.session_state.visual_position = "左下"
+                                st.rerun()
                         
                         with col2:
                             if st.button("⬆️ 上中", key="pos_tc", use_container_width=True):
                                 st.session_state.visual_position = "上中"
+                                st.rerun()
                             if st.button("⏺️ 中央", key="pos_cc", use_container_width=True):
                                 st.session_state.visual_position = "中央"
+                                st.rerun()
                             if st.button("⬇️ 下中", key="pos_bc", use_container_width=True):
                                 st.session_state.visual_position = "下中"
+                                st.rerun()
                         
                         with col3:
                             if st.button("↗️ 右上", key="pos_tr", use_container_width=True):
                                 st.session_state.visual_position = "右上"
+                                st.rerun()
                             if st.button("➡️ 右中", key="pos_mr", use_container_width=True):
                                 st.session_state.visual_position = "右中"
+                                st.rerun()
                             if st.button("↘️ 右下", key="pos_br", use_container_width=True):
                                 st.session_state.visual_position = "右下"
+                                st.rerun()
                         
                         # 選択された位置を表示
                         selected_pos = st.session_state.get('visual_position', '下中')
