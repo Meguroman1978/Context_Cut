@@ -955,11 +955,30 @@ def generate_final_video_with_subtitle(
             
             # 自動位置調整が有効の場合、吹き出しの中央にテキストを配置
             if auto_position:
-                # 吹き出し画像の中心を計算
-                # 吹き出し画像は下から80pxの位置にあり、高さは約400px
-                # 吹き出しの中心 = 下から80px + 吹き出し高さの半分(200px) = 下から280px
-                text_x = '(w-text_w)/2'           # 水平方向は中央
-                text_y = 'h-280-(text_h/2)'       # 吹き出しの垂直中央
+                # 吹き出しの位置名を取得（9分割グリッド）
+                bg_position_name = st.session_state.get('telop_bg_position_name', '下中')
+                
+                # 吹き出し画像のサイズ（デフォルト400x400pxをスケール調整）
+                balloon_width = int(400 * balloon_scale)
+                balloon_height = int(400 * balloon_scale)
+                balloon_half_w = balloon_width // 2
+                balloon_half_h = balloon_height // 2
+                
+                # 位置名に基づいてテキストの中心座標を計算
+                # overlay座標系 → drawtext座標系への変換
+                text_position_map = {
+                    "左上": (f'20+{balloon_half_w}-(text_w/2)', f'20+{balloon_half_h}-(text_h/2)'),
+                    "上中": ('(w-text_w)/2', f'20+{balloon_half_h}-(text_h/2)'),
+                    "右上": (f'w-20-{balloon_half_w}-(text_w/2)', f'20+{balloon_half_h}-(text_h/2)'),
+                    "左中": (f'20+{balloon_half_w}-(text_w/2)', '(h-text_h)/2'),
+                    "中央": ('(w-text_w)/2', '(h-text_h)/2'),
+                    "右中": (f'w-20-{balloon_half_w}-(text_w/2)', '(h-text_h)/2'),
+                    "左下": (f'20+{balloon_half_w}-(text_w/2)', f'h-20-{balloon_half_h}-(text_h/2)'),
+                    "下中": ('(w-text_w)/2', f'h-80-{balloon_half_h}-(text_h/2)'),
+                    "右下": (f'w-20-{balloon_half_w}-(text_w/2)', f'h-20-{balloon_half_h}-(text_h/2)')
+                }
+                
+                text_x, text_y = text_position_map.get(bg_position_name, ('(w-text_w)/2', f'h-80-{balloon_half_h}-(text_h/2)'))
             else:
                 text_x = x_position
                 text_y = y_position
@@ -2044,7 +2063,7 @@ def main():
                         if bg_position_mode == "プリセット":
                             bg_position_preset = st.selectbox(
                                 "背景位置",
-                                ["下部中央", "上部中央", "中央", "左下", "右下", "左上", "右上"],
+                                ["下部中央", "上部中央", "中央", "左上", "左中", "左下", "右上", "右中", "右下"],
                                 key="bg_position_preset_telop"
                             )
                             
@@ -2052,12 +2071,27 @@ def main():
                                 "下部中央": ("(main_w-overlay_w)/2", "main_h-overlay_h-80"),
                                 "上部中央": ("(main_w-overlay_w)/2", "20"),
                                 "中央": ("(main_w-overlay_w)/2", "(main_h-overlay_h)/2"),
-                                "左下": ("20", "main_h-overlay_h-20"),
-                                "右下": ("main_w-overlay_w-20", "main_h-overlay_h-20"),
                                 "左上": ("20", "20"),
-                                "右上": ("main_w-overlay_w-20", "20")
+                                "左中": ("20", "(main_h-overlay_h)/2"),
+                                "左下": ("20", "main_h-overlay_h-20"),
+                                "右上": ("main_w-overlay_w-20", "20"),
+                                "右中": ("main_w-overlay_w-20", "(main_h-overlay_h)/2"),
+                                "右下": ("main_w-overlay_w-20", "main_h-overlay_h-20")
                             }
                             bg_x_pos, bg_y_pos = bg_position_map[bg_position_preset]
+                            # 位置名も保存（テキスト自動配置用）
+                            bg_position_name_map = {
+                                "下部中央": "下中",
+                                "上部中央": "上中",
+                                "中央": "中央",
+                                "左上": "左上",
+                                "左中": "左中",
+                                "左下": "左下",
+                                "右上": "右上",
+                                "右中": "右中",
+                                "右下": "右下"
+                            }
+                            st.session_state.telop_bg_position_name = bg_position_name_map.get(bg_position_preset, "下中")
                         
                         else:  # 背景位置選択
                             st.write("**背景位置を選択**")
@@ -2116,6 +2150,9 @@ def main():
                         # セッションステートに保存
                         st.session_state.telop_bg_x_pos = bg_x_pos
                         st.session_state.telop_bg_y_pos = bg_y_pos
+                        # 位置名も保存（テキスト自動配置用）
+                        if bg_position_mode == "背景位置選択":
+                            st.session_state.telop_bg_position_name = selected_bg_pos
                     
                     # リアルタイムプレビュー生成ボタン
                     if st.button("🔄 プレビューを更新", key="update_preview"):
