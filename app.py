@@ -596,7 +596,9 @@ def generate_final_video_with_subtitle(
     font_color: str,
     background_type: str,
     x_position: str = "(w-text_w)/2",
-    y_position: str = "h-text_h-20"
+    y_position: str = "h-text_h-20",
+    auto_position: bool = True,
+    auto_size: bool = False
 ) -> bool:
     """テロップ付き最終動画を生成（吹き出し画像対応）"""
     try:
@@ -631,16 +633,29 @@ def generate_final_video_with_subtitle(
                 format='auto'
             )
             
-            # テキストを吹き出しの中央に強制配置
-            # 吹き出しの中心にテキストを配置（動画の中央、下部から約200px）
+            # 自動位置調整が有効の場合、吹き出しの中央にテキストを配置
+            if auto_position:
+                text_x = '(w-text_w)/2'  # 水平中央
+                text_y = 'h-200'         # 吹き出しの中央付近
+            else:
+                text_x = x_position
+                text_y = y_position
+            
+            # 自動サイズ調整が有効の場合、フォントサイズを調整
+            if auto_size:
+                adjusted_font_size = int(font_size * 0.65)  # 65%に縮小
+            else:
+                adjusted_font_size = font_size
+            
+            # テキストを描画
             video_stream = video_stream.filter(
                 'drawtext',
                 text=escaped_text,
                 fontfile=font_path,
-                fontsize=font_size,
+                fontsize=adjusted_font_size,
                 fontcolor=font_color,
-                x='(w-text_w)/2',         # テキストを水平方向の中央に
-                y='h-200'                 # 吹き出しの中央付近（下から200px）
+                x=text_x,
+                y=text_y
             )
         # シンプル背景モード
         else:
@@ -931,6 +946,10 @@ def main():
                         if transcription:
                             st.session_state.transcription = transcription
                             st.session_state.video_duration = get_video_duration(st.session_state.video_path)
+                            
+                            # 文字起こしテキストを結合して保存（検索クエリ候補生成用）
+                            transcript_segments = [seg['text'] for seg in transcription['segments']]
+                            st.session_state.transcript_text = ' '.join(transcript_segments)
                             
                             # ChromaDBにインデックス化
                             video_name = Path(st.session_state.video_path).stem
