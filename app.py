@@ -375,6 +375,53 @@ def create_preview_clip(video_path: str, start_time: float, end_time: float, out
         return False
 
 
+def get_background_settings(background_type: str) -> Tuple[int, str, int]:
+    """背景タイプから設定を取得"""
+    # シンプル背景
+    simple_backgrounds = {
+        "なし（透明）": (0, "black@0.0", 0),
+        "黒（半透明）": (1, "black@0.5", 5),
+        "白（半透明）": (1, "white@0.8", 5),
+        "黒（不透明）": (1, "black@1.0", 5),
+        "白（不透明）": (1, "white@1.0", 5),
+        "黄色（半透明）": (1, "yellow@0.7", 5),
+        "青（半透明）": (1, "blue@0.7", 5),
+        "赤（半透明）": (1, "red@0.7", 5),
+        "緑（半透明）": (1, "green@0.7", 5),
+    }
+    
+    # 吹き出し風背景（すべて角丸+padding大きめで表現）
+    balloon_backgrounds = {
+        "💬 楕円吹き出し（白）": (1, "white@0.95", 15),
+        "💬 楕円吹き出し（黒）": (1, "black@0.85", 15),
+        "🎈 風船吹き出し（白）": (1, "white@0.95", 20),
+        "🎈 風船吹き出し（黒）": (1, "black@0.85", 20),
+        "🗨️ 角丸長方形（白）": (1, "white@0.95", 12),
+        "🗨️ 角丸長方形（黒）": (1, "black@0.85", 12),
+        "⬛ 角張り長方形（白）": (1, "white@0.95", 2),
+        "⬛ 角張り長方形（黒）": (1, "black@0.85", 2),
+        "💍 ダイア形（白）": (1, "white@0.95", 8),
+        "💍 ダイア形（黒）": (1, "black@0.85", 8),
+        "⬣ 六角形（白）": (1, "white@0.95", 10),
+        "⬣ 六角形（黒）": (1, "black@0.85", 10),
+        "☁️ 雲形（白）": (1, "white@0.95", 18),
+        "☁️ 雲形（黒）": (1, "black@0.85", 18),
+        "💥 爆発形（白）": (1, "white@0.95", 25),
+        "💥 爆発形（黒）": (1, "black@0.85", 25),
+        "⭐ 放射線（白）": (1, "white@0.95", 30),
+        "⭐ 放射線（黒）": (1, "black@0.85", 30),
+    }
+    
+    # 該当する背景を検索
+    if background_type in simple_backgrounds:
+        return simple_backgrounds[background_type]
+    elif background_type in balloon_backgrounds:
+        return balloon_backgrounds[background_type]
+    else:
+        # デフォルト
+        return (0, "black@0.0", 0)
+
+
 def generate_final_video_with_subtitle(
     video_path: str,
     start_time: float,
@@ -400,19 +447,8 @@ def generate_final_video_with_subtitle(
         escaped_text = escaped_text.replace(":", "\\:")
         escaped_text = escaped_text.replace("\n", " ")
         
-        # 背景設定
-        box = 0
-        boxcolor = "black@0.0"
-        boxborderw = 0
-        
-        if background_type == "黒（半透明）":
-            box = 1
-            boxcolor = "black@0.5"
-            boxborderw = 5
-        elif background_type == "白":
-            box = 1
-            boxcolor = "white@0.8"
-            boxborderw = 5
+        # 背景設定を取得
+        box, boxcolor, boxborderw = get_background_settings(background_type)
         
         # FFmpegコマンドの実行
         input_stream = ffmpeg.input(video_path, ss=start_time, to=end_time)
@@ -811,53 +847,56 @@ def main():
                 # メッセージを一度だけ表示
                 st.session_state.scene_selected = False
             
-            # セッション状態の範囲を取得（動画の長さを超えないように）
-            safe_end = min(st.session_state.selected_end, st.session_state.video_duration)
-            if safe_end <= st.session_state.selected_start:
-                safe_end = min(st.session_state.selected_start + 5.0, st.session_state.video_duration)
+            # セッション状態から初期値を取得
+            initial_start = float(st.session_state.selected_start)
+            initial_end = float(st.session_state.selected_end)
             
-            # スライダーでの範囲選択（最初に表示）
-            st.subheader("スライダーで範囲選択")
+            # 動画の長さを超えないように調整
+            if initial_end > st.session_state.video_duration:
+                initial_end = st.session_state.video_duration
+            if initial_end <= initial_start:
+                initial_end = min(initial_start + 5.0, st.session_state.video_duration)
+            
+            # Number Inputでの詳細設定（最初に表示）
+            st.subheader("📏 詳細設定")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                start_time = st.number_input(
+                    "開始時間（秒）",
+                    min_value=0.0,
+                    max_value=st.session_state.video_duration,
+                    value=initial_start,
+                    step=0.1,
+                    key="cut_start_input",
+                    format="%.2f"
+                )
+            
+            with col2:
+                end_time = st.number_input(
+                    "終了時間（秒）",
+                    min_value=0.0,
+                    max_value=st.session_state.video_duration,
+                    value=initial_end,
+                    step=0.1,
+                    key="cut_end_input",
+                    format="%.2f"
+                )
+            
+            # スライダーでの微調整
+            st.subheader("🎯 スライダーで微調整")
             time_range = st.slider(
                 "範囲選択",
                 0.0,
                 st.session_state.video_duration,
-                (float(st.session_state.selected_start), float(safe_end)),
+                (start_time, end_time),
                 step=0.1,
                 key="cut_range_slider"
             )
             
-            start_time, end_time = time_range
-            
-            # Number Inputでの詳細設定
-            st.subheader("詳細設定")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                start_time_input = st.number_input(
-                    "開始時間（秒）",
-                    min_value=0.0,
-                    max_value=st.session_state.video_duration,
-                    value=float(start_time),
-                    step=0.1,
-                    key="cut_start_input"
-                )
-                # Number Inputが変更された場合はそれを優先
-                if start_time_input != start_time:
-                    start_time = start_time_input
-            
-            with col2:
-                end_time_input = st.number_input(
-                    "終了時間（秒）",
-                    min_value=0.0,
-                    max_value=st.session_state.video_duration,
-                    value=float(end_time),
-                    step=0.1,
-                    key="cut_end_input"
-                )
-                # Number Inputが変更された場合はそれを優先
-                if end_time_input != end_time:
-                    end_time = end_time_input
+            # スライダーが変更された場合はそれを優先
+            if time_range != (start_time, end_time):
+                start_time, end_time = time_range
             
             st.write(f"📏 選択範囲: {end_time - start_time:.2f}秒")
             
@@ -874,9 +913,26 @@ def main():
                     st.session_state.clip_start = start_time
                     st.session_state.clip_end = end_time
             
-            # プレビュー動画を表示（テロップ編集と同じサイズ）
+            # プレビュー動画を小さく表示
             if 'preview_path' in st.session_state and st.session_state.preview_path:
                 st.subheader("📹 プレビュー")
+                
+                # CSSで動画サイズを小さくする
+                st.markdown(
+                    """
+                    <style>
+                    [data-testid="stVideo"] {
+                        max-width: 400px !important;
+                        margin: 0 auto;
+                    }
+                    [data-testid="stVideo"] video {
+                        max-width: 100% !important;
+                        height: auto !important;
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
                 st.video(st.session_state.preview_path)
         
         # タブ3: テロップ編集
@@ -921,12 +977,55 @@ def main():
                     # 文字色
                     font_color = st.color_picker("文字色", "#FFFFFF", key="font_color_picker")
                     
-                    # 背景色
-                    background_type = st.selectbox(
-                        "背景",
-                        ["なし（透明）", "黒（半透明）", "白"],
-                        key="background_select"
+                    # 背景デザイン
+                    background_category = st.radio(
+                        "背景カテゴリ",
+                        ["シンプル", "吹き出し風"],
+                        key="background_category",
+                        horizontal=True
                     )
+                    
+                    if background_category == "シンプル":
+                        background_type = st.selectbox(
+                            "背景タイプ",
+                            [
+                                "なし（透明）",
+                                "黒（半透明）",
+                                "白（半透明）",
+                                "黒（不透明）",
+                                "白（不透明）",
+                                "黄色（半透明）",
+                                "青（半透明）",
+                                "赤（半透明）",
+                                "緑（半透明）"
+                            ],
+                            key="background_select_simple"
+                        )
+                    else:
+                        background_type = st.selectbox(
+                            "吹き出しデザイン",
+                            [
+                                "💬 楕円吹き出し（白）",
+                                "💬 楕円吹き出し（黒）",
+                                "🎈 風船吹き出し（白）",
+                                "🎈 風船吹き出し（黒）",
+                                "🗨️ 角丸長方形（白）",
+                                "🗨️ 角丸長方形（黒）",
+                                "⬟ 角張り長方形（白）",
+                                "⬟ 角張り長方形（黒）",
+                                "💍 ダイヤ形（白）",
+                                "💍 ダイヤ形（黒）",
+                                "⬣ 六角形（白）",
+                                "⬣ 六角形（黒）",
+                                "☁️ 雲形（白）",
+                                "☁️ 雲形（黒）",
+                                "💥 爆発形（白）",
+                                "💥 爆発形（黒）",
+                                "⭐ 放射線（白）",
+                                "⭐ 放射線（黒）"
+                            ],
+                            key="background_select_balloon"
+                        )
                     
                     # 位置設定
                     position_mode = st.radio(
@@ -1033,8 +1132,26 @@ def main():
                             st.warning("テロップテキストを入力してください。")
                 
                 with col_preview:
-                    # リアルタイムプレビュー表示
+                    # リアルタイムプレビュー表示（小さいサイズ）
                     st.subheader("🎬 プレビュー")
+                    
+                    # CSSで動画サイズを小さくする
+                    st.markdown(
+                        """
+                        <style>
+                        [data-testid="stVideo"] {
+                            max-width: 400px !important;
+                            margin: 0 auto;
+                        }
+                        [data-testid="stVideo"] video {
+                            max-width: 100% !important;
+                            height: auto !important;
+                        }
+                        </style>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                    
                     if 'preview_with_subtitle_path' in st.session_state:
                         st.video(st.session_state.preview_with_subtitle_path)
                         st.info("💡 左側の設定を変更したら「プレビューを更新」をクリックしてください")
