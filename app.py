@@ -509,6 +509,10 @@ def main():
         st.session_state.active_tab = 0
     if 'scene_preview_dialog_open' not in st.session_state:
         st.session_state.scene_preview_dialog_open = False
+    if 'search_results' not in st.session_state:
+        st.session_state.search_results = []
+    if 'scene_selected' not in st.session_state:
+        st.session_state.scene_selected = False
     
     # サイドバー: 動画取得
     with st.sidebar:
@@ -745,68 +749,67 @@ def main():
                     )
                     
                     if scenes:
+                        # 検索結果をセッション状態に保存
+                        st.session_state.search_results = scenes
                         st.success(f"✅ {len(scenes)}件のシーンが見つかりました!")
+                    else:
+                        st.session_state.search_results = []
+                        st.warning("検索結果が見つかりませんでした。")
+            
+            # 検索結果の表示
+            if st.session_state.search_results:
+                st.write(f"**{len(st.session_state.search_results)}件のシーン**")
+                
+                for i, scene in enumerate(st.session_state.search_results, 1):
+                    with st.expander(f"シーン {i}: {scene['start']:.1f}s - {scene['end']:.1f}s"):
+                        st.write(f"**テキスト:** {scene['text']}")
+                        st.write(f"**開始:** {scene['start']:.2f}秒")
+                        st.write(f"**終了:** {scene['end']:.2f}秒")
                         
-                        for i, scene in enumerate(scenes, 1):
-                            with st.expander(f"シーン {i}: {scene['start']:.1f}s - {scene['end']:.1f}s"):
-                                st.write(f"**テキスト:** {scene['text']}")
-                                st.write(f"**開始:** {scene['start']:.2f}秒")
-                                st.write(f"**終了:** {scene['end']:.2f}秒")
-                                
-                                # ボタンを横並びに配置
-                                col_btn1, col_btn2 = st.columns(2)
-                                
-                                with col_btn1:
-                                    # シーンプレビューボタン
-                                    if st.button(f"このシーンをプレビュー", key=f"preview_{i}", use_container_width=True):
+                        # ボタンを横並びに配置
+                        col_btn1, col_btn2 = st.columns(2)
+                        
+                        with col_btn1:
+                            # シーンプレビューボタン
+                            if st.button(f"🎬 プレビュー", key=f"preview_{i}", use_container_width=True):
+                                # プレビュー動画を生成
+                                with st.spinner("プレビューを生成中..."):
+                                    preview_path = str(TEMP_VIDEOS_DIR / f"scene_preview_{i}.mp4")
+                                    if create_preview_clip(
+                                        st.session_state.video_path,
+                                        scene['start'],
+                                        scene['end'],
+                                        preview_path
+                                    ):
                                         # プレビュー用のセッション状態を設定
                                         st.session_state.preview_scene_start = scene['start']
                                         st.session_state.preview_scene_end = scene['end']
                                         st.session_state.preview_scene_id = i
-                                        st.session_state.scene_preview_dialog_open = True
-                                        
-                                        # プレビュー動画を生成
-                                        preview_path = str(TEMP_VIDEOS_DIR / f"scene_preview_{i}.mp4")
-                                        create_preview_clip(
-                                            st.session_state.video_path,
-                                            scene['start'],
-                                            scene['end'],
-                                            preview_path
-                                        )
+                                        st.session_state.preview_scene_text = scene['text']
                                         st.session_state.current_scene_preview_path = preview_path
-                                
-                                with col_btn2:
-                                    # シーンを選択ボタン
-                                    if st.button(f"このシーンを選択", key=f"select_{i}", use_container_width=True):
-                                        st.session_state.selected_start = scene['start']
-                                        st.session_state.selected_end = scene['end']
-                                        st.session_state.force_tab_index = 1  # カット範囲指定タブに移動
-                                        st.success(f"✅ シーンを選択しました！カット範囲指定タブに移動します...")
+                                        st.session_state.scene_preview_dialog_open = True
                                         st.rerun()
                         
-                        # シーンプレビューのダイアログ（ポップアップ）
-                        @st.dialog("🎬 シーンプレビュー", width="small")
-                        def show_scene_preview_dialog():
-                            if 'current_scene_preview_path' in st.session_state:
-                                st.write(f"**シーン {st.session_state.preview_scene_id}**")
-                                st.write(f"⏱️ {st.session_state.preview_scene_start:.2f}秒 - {st.session_state.preview_scene_end:.2f}秒")
-                                
-                                # 小さいサイズでプレビュー表示
-                                st.video(st.session_state.current_scene_preview_path, loop=True)
-                                
-                                if st.button("✖️ 閉じる", use_container_width=True):
-                                    st.session_state.scene_preview_dialog_open = False
-                                    st.rerun()
-                        
-                        # ダイアログを表示
-                        if st.session_state.scene_preview_dialog_open:
-                            show_scene_preview_dialog()
-                    else:
-                        st.warning("検索結果が見つかりませんでした。")
+                        with col_btn2:
+                            # シーンを選択ボタン
+                            if st.button(f"✂️ 選択", key=f"select_{i}", use_container_width=True):
+                                st.session_state.selected_start = scene['start']
+                                st.session_state.selected_end = scene['end']
+                                st.session_state.scene_selected = True
+                                st.success(f"✅ シーンを選択しました！「カット範囲指定」タブを開いてください。")
+                                # 選択後にスクロールしてタブが見えるようにする
+                                st.rerun()
         
         # タブ2: カット範囲指定
         with tab2:
             st.header("✂️ カット範囲の指定")
+            
+            # シーン選択時のメッセージ表示
+            if st.session_state.get('scene_selected', False):
+                st.success(f"✅ シーンを選択しました！開始: {st.session_state.selected_start:.2f}秒、終了: {st.session_state.selected_end:.2f}秒")
+                st.info("💡 スライダーまたは数値入力で範囲を調整できます。調整が終わったら「プレビューを生成」をクリックしてください。")
+                # メッセージを一度だけ表示
+                st.session_state.scene_selected = False
             
             # セッション状態の範囲を取得（動画の長さを超えないように）
             safe_end = min(st.session_state.selected_end, st.session_state.video_duration)
@@ -1099,6 +1102,36 @@ def main():
     
     else:
         st.info("👈 サイドバーから動画を取得し、文字起こしを実行してください。")
+    
+    # シーンプレビューのダイアログ（ポップアップ）
+    @st.dialog("🎬 シーンプレビュー", width="small")
+    def show_scene_preview_dialog():
+        if 'current_scene_preview_path' in st.session_state:
+            st.write(f"**シーン {st.session_state.preview_scene_id}**")
+            st.write(f"⏱️ {st.session_state.preview_scene_start:.2f}秒 - {st.session_state.preview_scene_end:.2f}秒")
+            
+            if 'preview_scene_text' in st.session_state:
+                st.info(f"💬 {st.session_state.preview_scene_text}")
+            
+            # 小さいサイズでプレビュー表示（自動ループ）
+            st.video(st.session_state.current_scene_preview_path, loop=True)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✖️ 閉じる", use_container_width=True, key="close_dialog"):
+                    st.session_state.scene_preview_dialog_open = False
+                    st.rerun()
+            with col2:
+                if st.button("✅ このシーンを選択", use_container_width=True, key="select_from_dialog"):
+                    st.session_state.selected_start = st.session_state.preview_scene_start
+                    st.session_state.selected_end = st.session_state.preview_scene_end
+                    st.session_state.scene_preview_dialog_open = False
+                    st.session_state.scene_selected = True
+                    st.rerun()
+    
+    # ダイアログを表示
+    if st.session_state.get('scene_preview_dialog_open', False):
+        show_scene_preview_dialog()
     
     # フッター
     st.markdown("---")
