@@ -1671,7 +1671,8 @@ def main():
                             
                             background_type = "custom"
                         else:
-                            st.warning("背景画像をアップロードしてください")\n                            background_type = "なし（透明）"
+                            st.warning("背景画像をアップロードしてください")
+                            background_type = "なし（透明）"
                     
                     # 位置設定
                     position_mode = st.radio(
