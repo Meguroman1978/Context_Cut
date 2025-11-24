@@ -417,9 +417,9 @@ def generate_final_video_with_subtitle(
         # FFmpegコマンドの実行
         input_stream = ffmpeg.input(video_path, ss=start_time, to=end_time)
         
-        # drawtextフィルタを適用
+        # 映像ストリームにdrawtextフィルタを適用
         if box > 0:
-            video = input_stream.filter(
+            video_stream = input_stream.video.filter(
                 'drawtext',
                 text=escaped_text,
                 fontfile=font_path,
@@ -432,7 +432,7 @@ def generate_final_video_with_subtitle(
                 boxborderw=boxborderw
             )
         else:
-            video = input_stream.filter(
+            video_stream = input_stream.video.filter(
                 'drawtext',
                 text=escaped_text,
                 fontfile=font_path,
@@ -442,12 +442,17 @@ def generate_final_video_with_subtitle(
                 y=y_position
             )
         
-        # 出力
+        # 音声ストリームを取得（そのままコピー）
+        audio_stream = input_stream.audio
+        
+        # 出力（映像と音声を結合）
         output = ffmpeg.output(
-            video,
+            video_stream,
+            audio_stream,
             output_path,
             vcodec='libx264',
             acodec='aac',
+            audio_bitrate='192k',
             **{'loglevel': 'warning', 'y': None}
         )
         
@@ -740,18 +745,19 @@ def main():
                                 
                                 with col_btn1:
                                     # シーンプレビューボタン
-                                    if st.button(f"このシーンをプレビュー", key=f"preview_{i}"):
+                                    if st.button(f"このシーンをプレビュー", key=f"preview_{i}", use_container_width=True):
                                         st.session_state.show_scene_preview = True
                                         st.session_state.preview_scene_start = scene['start']
                                         st.session_state.preview_scene_end = scene['end']
                                         st.session_state.preview_scene_id = i
+                                        st.rerun()
                                 
                                 with col_btn2:
                                     # シーンを選択ボタン
-                                    if st.button(f"このシーンを選択", key=f"select_{i}"):
+                                    if st.button(f"このシーンを選択", key=f"select_{i}", use_container_width=True):
                                         st.session_state.selected_start = scene['start']
                                         st.session_state.selected_end = scene['end']
-                                        st.success("✅ シーンを選択しました！「カット範囲指定」タブで調整できます。")
+                                        st.rerun()
                         
                         # シーンプレビューのポップアップ表示
                         if st.session_state.show_scene_preview:
@@ -824,15 +830,14 @@ def main():
                 preview_path = str(TEMP_VIDEOS_DIR / "preview.mp4")
                 if create_preview_clip(st.session_state.video_path, start_time, end_time, preview_path):
                     st.success("✅ プレビュー生成完了!")
-                    # 動画サイズを1/6に縮小して表示（width=300px程度）
-                    st.video(preview_path, format="video/mp4", start_time=0)
-                    st.markdown(
-                        '<style>div[data-testid="stVideo"] video { max-width: 300px !important; }</style>',
-                        unsafe_allow_html=True
-                    )
                     st.session_state.preview_path = preview_path
                     st.session_state.clip_start = start_time
                     st.session_state.clip_end = end_time
+            
+            # プレビュー動画を表示（テロップ編集と同じサイズ）
+            if 'preview_path' in st.session_state and st.session_state.preview_path:
+                st.subheader("📹 プレビュー")
+                st.video(st.session_state.preview_path)
         
         # タブ3: テロップ編集
         with tab3:
