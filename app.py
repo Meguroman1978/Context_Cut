@@ -557,18 +557,19 @@ def generate_final_video_with_subtitle(
         if bg_settings['mode'] == 'balloon' and bg_settings['balloon_image']:
             balloon_path = str(Path(bg_settings['balloon_image']).absolute()).replace("\\", "/")
             
-            # 吹き出し画像をオーバーレイ
+            # 吹き出し画像をオーバーレイ（動画の下部中央に配置）
             balloon_stream = ffmpeg.input(balloon_path)
             
-            # 吹き出し画像を動画に重ねる（位置調整）
+            # 吹き出し画像を動画に重ねる（固定位置: 下部中央）
+            # overlayは固定座標が必要なので、動画幅の中央、下から80pxの位置に配置
             video_stream = video_stream.overlay(
                 balloon_stream,
-                x=x_position,
-                y=y_position,
+                x='(main_w-overlay_w)/2',  # 中央配置
+                y='main_h-overlay_h-80',   # 下から80px
                 format='auto'
             )
             
-            # テキストを吹き出しの上に描画（boxなし）
+            # テキストを吹き出しの上に描画（位置は元のx_position, y_positionを使用）
             video_stream = video_stream.filter(
                 'drawtext',
                 text=escaped_text,
@@ -1003,17 +1004,33 @@ def main():
             # スライダーでの範囲指定（詳細設定は削除）
             st.subheader("🎯 スライダーで範囲を指定")
             
+            # 現在の選択範囲を大きく表示
+            st.markdown(f"""
+                <div style="background-color: #e8f4f8; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <h3 style="margin: 0; color: #0066cc;">📍 現在の選択範囲</h3>
+                    <p style="font-size: 24px; margin: 10px 0 0 0; color: #333;">
+                        <strong>{initial_start:.2f}秒</strong> 〜 <strong>{initial_end:.2f}秒</strong> 
+                        （長さ: <strong>{initial_end - initial_start:.2f}秒</strong>）
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+            
             # スライダーのデフォルト値を設定
             time_range = st.slider(
-                "開始・終了時間を調整",
+                "開始・終了時間を調整（スライダーを動かして微調整）",
                 min_value=0.0,
                 max_value=st.session_state.video_duration,
                 value=(initial_start, initial_end),
                 step=0.1,
-                key="cut_range_slider"
+                key="cut_range_slider",
+                format="%.2f秒"
             )
             
             start_time, end_time = time_range
+            
+            # スライダー調整後の値を表示
+            if (start_time != initial_start) or (end_time != initial_end):
+                st.warning(f"⚠️ スライダーを調整しました: {start_time:.2f}秒 〜 {end_time:.2f}秒")
             
             # 選択範囲を表示
             col1, col2, col3 = st.columns(3)
@@ -1028,14 +1045,20 @@ def main():
             st.session_state.selected_start = start_time
             st.session_state.selected_end = end_time
             
+            # デバッグ情報を表示
+            st.write(f"🔍 デバッグ: start_time={start_time:.2f}, end_time={end_time:.2f}")
+            
             # プレビュー生成
             if st.button("プレビューを生成"):
                 preview_path = str(TEMP_VIDEOS_DIR / "preview.mp4")
+                st.info(f"📹 プレビュー生成中: {start_time:.2f}秒 〜 {end_time:.2f}秒")
                 if create_preview_clip(st.session_state.video_path, start_time, end_time, preview_path):
-                    st.success("✅ プレビュー生成完了!")
+                    st.success(f"✅ プレビュー生成完了! 範囲: {start_time:.2f}秒 〜 {end_time:.2f}秒")
                     st.session_state.preview_path = preview_path
                     st.session_state.clip_start = start_time
                     st.session_state.clip_end = end_time
+                else:
+                    st.error(f"❌ プレビュー生成失敗: {start_time:.2f}秒 〜 {end_time:.2f}秒")
             
             # プレビュー動画を小さく表示
             if 'preview_path' in st.session_state and st.session_state.preview_path:
