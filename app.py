@@ -248,14 +248,69 @@ def load_whisper_model(model_name: str = "base"):
         return None
 
 
+def check_video_has_audio(video_path: str) -> bool:
+    """動画に音声トラックがあるかチェック"""
+    try:
+        probe = ffmpeg.probe(video_path)
+        audio_streams = [stream for stream in probe['streams'] if stream['codec_type'] == 'audio']
+        return len(audio_streams) > 0
+    except Exception as e:
+        st.warning(f"動画情報の取得に失敗: {e}")
+        return False
+
+
 def transcribe_video(video_path: str, model) -> Optional[Dict]:
     """動画から音声を文字起こし"""
     try:
-        st.info("動画を文字起こし中... (数分かかる場合があります)")
-        result = model.transcribe(video_path, language='ja', verbose=False)
+        # 音声トラックの確認
+        if not check_video_has_audio(video_path):
+            st.error("❌ この動画には音声トラックがありません。")
+            st.info("💡 音声付きの動画を使用するか、音声なしで動画編集を行ってください。")
+            return None
+        
+        st.info("🎤 動画を文字起こし中... (数分かかる場合があります)")
+        
+        # Whisperで文字起こし実行
+        result = model.transcribe(
+            video_path, 
+            language='ja', 
+            verbose=False,
+            fp16=False  # CPU互換性のため
+        )
+        
+        # 結果の検証
+        if not result or 'segments' not in result:
+            st.error("❌ 文字起こし結果が空です。")
+            return None
+        
+        if len(result['segments']) == 0:
+            st.warning("⚠️ 音声は検出されましたが、テキストが認識できませんでした。")
+            st.info("💡 考えられる原因:\n- 音声が小さすぎる\n- 背景ノイズが多い\n- 言語が日本語ではない")
+            return None
+        
+        st.success(f"✅ 文字起こし完了！ {len(result['segments'])}個のセグメントを検出しました。")
         return result
+        
     except Exception as e:
-        st.error(f"文字起こしに失敗しました: {e}")
+        error_msg = str(e)
+        
+        if "cannot reshape tensor" in error_msg:
+            st.error("❌ 音声データの処理に失敗しました。")
+            st.error("**エラー詳細**: 音声ストリームが空または破損しています。")
+            st.info("""
+            💡 **対処方法**:
+            1. 動画に音声トラックが含まれているか確認してください
+            2. 別の動画形式（MP4, MOV）で試してください
+            3. 音声付きで動画を再エンコードしてみてください
+               ```
+               ffmpeg -i input.mp4 -c:v copy -c:a aac output.mp4
+               ```
+            4. または、音声なしで動画編集機能のみ使用してください
+            """)
+        else:
+            st.error(f"❌ 文字起こしに失敗しました: {error_msg}")
+            st.info("💡 動画ファイルが破損していないか、または別の動画で試してください。")
+        
         return None
 
 
@@ -730,27 +785,39 @@ def main():
         # 文字起こし実行
         st.header("🎤 AI文字起こし")
         if st.session_state.video_path:
-            if st.button("文字起こしを実行"):
-                model = load_whisper_model("base")
-                if model:
-                    transcription = transcribe_video(st.session_state.video_path, model)
-                    if transcription:
-                        st.session_state.transcription = transcription
-                        st.session_state.video_duration = get_video_duration(st.session_state.video_path)
-                        
-                        # ChromaDBにインデックス化
-                        video_name = Path(st.session_state.video_path).stem
-                        collection_name = index_transcription_to_chromadb(
-                            transcription,
-                            video_name,
-                            st.session_state.chromadb_client
-                        )
-                        st.session_state.collection_name = collection_name
+            st.info("💡 シーン検索機能を使用する場合は文字起こしが必要です。\n文字起こしなしでも、カット範囲指定とテロップ編集は使用できます。")
+            
+            col_trans1, col_trans2 = st.columns(2)
+            with col_trans1:
+                if st.button("🎤 文字起こしを実行", use_container_width=True):
+                    model = load_whisper_model("base")
+                    if model:
+                        transcription = transcribe_video(st.session_state.video_path, model)
+                        if transcription:
+                            st.session_state.transcription = transcription
+                            st.session_state.video_duration = get_video_duration(st.session_state.video_path)
+                            
+                            # ChromaDBにインデックス化
+                            video_name = Path(st.session_state.video_path).stem
+                            collection_name = index_transcription_to_chromadb(
+                                transcription,
+                                video_name,
+                                st.session_state.chromadb_client
+                            )
+                            st.session_state.collection_name = collection_name
+            
+            with col_trans2:
+                if st.button("⏭️ 文字起こしをスキップ", use_container_width=True):
+                    st.session_state.transcription = {"segments": []}  # 空の文字起こし
+                    st.session_state.video_duration = get_video_duration(st.session_state.video_path)
+                    st.session_state.skip_transcription = True
+                    st.success("✅ 文字起こしをスキップしました。カット範囲指定とテロップ編集が使用できます。")
+                    st.rerun()
         else:
             st.info("まず動画を取得してください。")
     
     # メインエリア
-    if st.session_state.video_path and st.session_state.transcription:
+    if st.session_state.video_path and st.session_state.transcription is not None:
         
         # タブUIの選択状態を管理
         tab_names = ["🔍 シーン検索", "✂️ カット範囲指定", "💬 テロップ編集"]
@@ -768,73 +835,78 @@ def main():
         with tab1:
             st.header("🔍 自然言語シーン検索")
             
-            search_query = st.text_input(
-                "検索クエリを入力",
-                placeholder="例: 面白いシーン, 感動的な場面, 商品の説明"
-            )
-            
-            n_results = st.slider("検索結果数", 1, 10, 5)
-            
-            if st.button("検索実行"):
-                if search_query and st.session_state.collection_name:
-                    scenes = search_scenes(
-                        search_query,
-                        st.session_state.collection_name,
-                        st.session_state.chromadb_client,
-                        n_results
-                    )
-                    
-                    if scenes:
-                        # 検索結果をセッション状態に保存
-                        st.session_state.search_results = scenes
-                        st.success(f"✅ {len(scenes)}件のシーンが見つかりました!")
-                    else:
-                        st.session_state.search_results = []
-                        st.warning("検索結果が見つかりませんでした。")
-            
-            # 検索結果の表示
-            if st.session_state.search_results:
-                st.write(f"**{len(st.session_state.search_results)}件のシーン**")
+            # 文字起こしがスキップされた場合の警告
+            if st.session_state.get('skip_transcription', False):
+                st.warning("⚠️ 文字起こしがスキップされたため、シーン検索機能は使用できません。")
+                st.info("💡 シーン検索を使用する場合は、サイドバーから「文字起こしを実行」を行ってください。\n\nまたは、「✂️ カット範囲指定」タブで手動で範囲を指定してください。")
+            else:
+                search_query = st.text_input(
+                    "検索クエリを入力",
+                    placeholder="例: 面白いシーン, 感動的な場面, 商品の説明"
+                )
                 
-                for i, scene in enumerate(st.session_state.search_results, 1):
-                    with st.expander(f"シーン {i}: {scene['start']:.1f}s - {scene['end']:.1f}s"):
-                        st.write(f"**テキスト:** {scene['text']}")
-                        st.write(f"**開始:** {scene['start']:.2f}秒")
-                        st.write(f"**終了:** {scene['end']:.2f}秒")
+                n_results = st.slider("検索結果数", 1, 10, 5)
+                
+                if st.button("検索実行"):
+                    if search_query and st.session_state.collection_name:
+                        scenes = search_scenes(
+                            search_query,
+                            st.session_state.collection_name,
+                            st.session_state.chromadb_client,
+                            n_results
+                        )
                         
-                        # ボタンを横並びに配置
-                        col_btn1, col_btn2 = st.columns(2)
-                        
-                        with col_btn1:
-                            # シーンプレビューボタン
-                            if st.button(f"🎬 プレビュー", key=f"preview_{i}", use_container_width=True):
-                                # プレビュー動画を生成
-                                with st.spinner("プレビューを生成中..."):
-                                    preview_path = str(TEMP_VIDEOS_DIR / f"scene_preview_{i}.mp4")
-                                    if create_preview_clip(
-                                        st.session_state.video_path,
-                                        scene['start'],
-                                        scene['end'],
-                                        preview_path
-                                    ):
-                                        # プレビュー用のセッション状態を設定
-                                        st.session_state.preview_scene_start = scene['start']
-                                        st.session_state.preview_scene_end = scene['end']
-                                        st.session_state.preview_scene_id = i
-                                        st.session_state.preview_scene_text = scene['text']
-                                        st.session_state.current_scene_preview_path = preview_path
-                                        st.session_state.scene_preview_dialog_open = True
-                                        st.rerun()
-                        
-                        with col_btn2:
-                            # シーンを選択ボタン
-                            if st.button(f"✂️ 選択", key=f"select_{i}", use_container_width=True):
-                                st.session_state.selected_start = scene['start']
-                                st.session_state.selected_end = scene['end']
-                                st.session_state.scene_selected = True
-                                st.success(f"✅ シーンを選択しました！「カット範囲指定」タブを開いてください。")
-                                # 選択後にスクロールしてタブが見えるようにする
-                                st.rerun()
+                        if scenes:
+                            # 検索結果をセッション状態に保存
+                            st.session_state.search_results = scenes
+                            st.success(f"✅ {len(scenes)}件のシーンが見つかりました!")
+                        else:
+                            st.session_state.search_results = []
+                            st.warning("検索結果が見つかりませんでした。")
+                
+                # 検索結果の表示
+                if st.session_state.search_results:
+                    st.write(f"**{len(st.session_state.search_results)}件のシーン**")
+                    
+                    for i, scene in enumerate(st.session_state.search_results, 1):
+                        with st.expander(f"シーン {i}: {scene['start']:.1f}s - {scene['end']:.1f}s"):
+                            st.write(f"**テキスト:** {scene['text']}")
+                            st.write(f"**開始:** {scene['start']:.2f}秒")
+                            st.write(f"**終了:** {scene['end']:.2f}秒")
+                            
+                            # ボタンを横並びに配置
+                            col_btn1, col_btn2 = st.columns(2)
+                            
+                            with col_btn1:
+                                # シーンプレビューボタン
+                                if st.button(f"🎬 プレビュー", key=f"preview_{i}", use_container_width=True):
+                                    # プレビュー動画を生成
+                                    with st.spinner("プレビューを生成中..."):
+                                        preview_path = str(TEMP_VIDEOS_DIR / f"scene_preview_{i}.mp4")
+                                        if create_preview_clip(
+                                            st.session_state.video_path,
+                                            scene['start'],
+                                            scene['end'],
+                                            preview_path
+                                        ):
+                                            # プレビュー用のセッション状態を設定
+                                            st.session_state.preview_scene_start = scene['start']
+                                            st.session_state.preview_scene_end = scene['end']
+                                            st.session_state.preview_scene_id = i
+                                            st.session_state.preview_scene_text = scene['text']
+                                            st.session_state.current_scene_preview_path = preview_path
+                                            st.session_state.scene_preview_dialog_open = True
+                                            st.rerun()
+                            
+                            with col_btn2:
+                                # シーンを選択ボタン
+                                if st.button(f"✂️ 選択", key=f"select_{i}", use_container_width=True):
+                                    st.session_state.selected_start = scene['start']
+                                    st.session_state.selected_end = scene['end']
+                                    st.session_state.scene_selected = True
+                                    st.success(f"✅ シーンを選択しました！「カット範囲指定」タブを開いてください。")
+                                    # 選択後にスクロールしてタブが見えるようにする
+                                    st.rerun()
         
         # タブ2: カット範囲指定
         with tab2:
