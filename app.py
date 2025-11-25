@@ -1853,12 +1853,19 @@ def main():
                                     st.session_state.clip_start = scene['start']  # 動画編集用
                                     st.session_state.clip_end = scene['end']  # 動画編集用
                                     st.session_state.scene_selected = True
-                                    st.success(f"✅ シーンを選択しました！「🎬 動画編集」タブで編集できます。")
+                                    st.session_state.show_edit_guidance = True  # 動画編集タブで案内を表示
+                                    st.success(f"✅ シーンを選択しました！")
+                                    st.info("💡 下の「🎬 動画編集」タブをクリックして編集を開始してください")
                                     st.rerun()
         
-        # タブ2: プロフェッショナル編集
+        # タブ2: 動画編集
         with tab2:
             st.header("🎬 動画編集")
+            
+            # シーン選択後の案内メッセージ
+            if st.session_state.get('show_edit_guidance', False):
+                st.success("✅ シーンが選択されました！このタブで編集を開始できます。")
+                st.session_state.show_edit_guidance = False
             
             # シーン選択またはカット範囲指定から範囲を取得
             has_clip_range = 'clip_start' in st.session_state and 'clip_end' in st.session_state
@@ -1923,7 +1930,7 @@ def main():
                         
                         # スライダーのデフォルト値は常に現在のclip_start/clip_endを使用
                         time_range = st.slider(
-                            "開始・終了時間を調整（スライダー）",
+                            "開始・終了時間を調整",
                             min_value=slider_min,
                             max_value=slider_max,
                             value=(float(clip_start), float(clip_end)),
@@ -1931,39 +1938,16 @@ def main():
                             key="pro_timeline_slider"
                         )
                         
-                        slider_start, slider_end = time_range
+                        new_start, new_end = time_range
                         
                         # スライダー調整後の値を表示
                         col_m1, col_m2, col_m3 = st.columns(3)
                         with col_m1:
-                            st.metric("開始時間", f"{slider_start:.2f}秒")
+                            st.metric("開始時間", f"{new_start:.2f}秒")
                         with col_m2:
-                            st.metric("終了時間", f"{slider_end:.2f}秒")
+                            st.metric("終了時間", f"{new_end:.2f}秒")
                         with col_m3:
-                            st.metric("長さ", f"{slider_end - slider_start:.2f}秒")
-                        
-                        st.markdown("---")
-                        st.write("**🔢 数値入力で微調整:**")
-                        
-                        col_n1, col_n2 = st.columns(2)
-                        with col_n1:
-                            new_start = st.number_input(
-                                "開始時間（秒）",
-                                min_value=0.0,
-                                max_value=st.session_state.video_duration,
-                                value=float(slider_start),
-                                step=0.1,
-                                key="pro_timeline_start"
-                            )
-                        with col_n2:
-                            new_end = st.number_input(
-                                "終了時間（秒）",
-                                min_value=new_start + 0.1,
-                                max_value=st.session_state.video_duration,
-                                value=float(slider_end),
-                                step=0.1,
-                                key="pro_timeline_end"
-                            )
+                            st.metric("長さ", f"{new_end - new_start:.2f}秒")
                         
                         # タイムライン適用ボタン
                         if st.button("⏱️ タイムラインを適用", type="primary", use_container_width=True):
@@ -2202,11 +2186,20 @@ def main():
                         
                         st.markdown("---")
                         
-                        col_t1, col_t2 = st.columns(2)
-                        with col_t1:
-                            text_start = st.number_input("開始時間（秒）", 0.0, clip_duration, 0.0, 0.1, key="new_text_start")
-                        with col_t2:
-                            text_end = st.number_input("終了時間（秒）", text_start, clip_duration, min(text_start + 3.0, clip_duration), 0.1, key="new_text_end")
+                        # 表示時間をスライダーで設定
+                        st.write("**⏱️ 表示時間設定**")
+                        text_time_range = st.slider(
+                            "表示時間範囲（秒）",
+                            min_value=0.0,
+                            max_value=clip_duration,
+                            value=(0.0, min(3.0, clip_duration)),
+                            step=0.1,
+                            key="new_text_time_slider"
+                        )
+                        text_start, text_end = text_time_range
+                        st.caption(f"📌 {text_start:.1f}秒 〜 {text_end:.1f}秒 （長さ: {text_end - text_start:.1f}秒）")
+                        
+                        st.markdown("---")
                         
                         col_t3, col_t4 = st.columns(2)
                         with col_t3:
@@ -2292,17 +2285,14 @@ def main():
                                 "表示時間範囲（秒）",
                                 min_value=0.0,
                                 max_value=clip_duration,
-                                value=st.session_state.sticker_time_slider,
+                                value=(0.0, min(3.0, clip_duration)),
                                 step=0.1,
                                 key="sticker_time_slider_widget"
                             )
-                            st.session_state.sticker_time_slider = sticker_time_range
+                            sticker_start, sticker_end = sticker_time_range
+                            st.caption(f"📌 {sticker_start:.1f}秒 〜 {sticker_end:.1f}秒 （長さ: {sticker_end - sticker_start:.1f}秒）")
                             
-                            col_s1, col_s2 = st.columns(2)
-                            with col_s1:
-                                sticker_start = st.number_input("開始時間（秒）", 0.0, clip_duration, float(sticker_time_range[0]), 0.1, key="new_sticker_start")
-                            with col_s2:
-                                sticker_end = st.number_input("終了時間（秒）", sticker_start, clip_duration, float(sticker_time_range[1]), 0.1, key="new_sticker_end")
+                            st.markdown("---")
                             
                             # 位置調整
                             st.write("**📍 位置設定**")
@@ -2502,38 +2492,16 @@ def main():
                                 "BGM再生範囲（秒）",
                                 min_value=0.0,
                                 max_value=clip_duration,
-                                value=(
-                                    st.session_state.pro_audio.get('bgm_start', 0.0),
-                                    st.session_state.pro_audio.get('bgm_end', clip_duration) or clip_duration
-                                ),
+                                value=(0.0, clip_duration),
                                 step=0.1,
                                 key="bgm_time_slider",
                                 help="BGMを再生する時間範囲を指定します。動画の途中から開始したり、途中で終了させることができます。"
                             )
                             
-                            col_bgm1, col_bgm2 = st.columns(2)
-                            with col_bgm1:
-                                bgm_start = st.number_input(
-                                    "開始時間（秒）",
-                                    min_value=0.0,
-                                    max_value=clip_duration,
-                                    value=float(bgm_time_range[0]),
-                                    step=0.1,
-                                    key="bgm_start_input"
-                                )
-                            with col_bgm2:
-                                bgm_end = st.number_input(
-                                    "終了時間（秒）",
-                                    min_value=bgm_start,
-                                    max_value=clip_duration,
-                                    value=float(bgm_time_range[1]),
-                                    step=0.1,
-                                    key="bgm_end_input"
-                                )
-                            
+                            bgm_start, bgm_end = bgm_time_range
                             st.session_state.pro_audio['bgm_start'] = bgm_start
                             st.session_state.pro_audio['bgm_end'] = bgm_end
-                            st.info(f"💡 BGMは {bgm_start:.1f}秒 から {bgm_end:.1f}秒 まで再生されます（長さ: {bgm_end - bgm_start:.1f}秒）")
+                            st.caption(f"📌 {bgm_start:.1f}秒 〜 {bgm_end:.1f}秒 （長さ: {bgm_end - bgm_start:.1f}秒）")
                             
                             st.markdown("---")
                             st.write("**🔊 音量バランス**")
@@ -2770,6 +2738,7 @@ def main():
                     st.session_state.clip_end = st.session_state.dialog_adjusted_end  # 動画編集用
                     st.session_state.scene_preview_dialog_open = False
                     st.session_state.scene_selected = True
+                    st.session_state.show_edit_guidance = True  # 動画編集タブで案内を表示
                     # スライダーの値をクリアして新しい値を反映させる
                     if 'cut_range_slider' in st.session_state:
                         del st.session_state.cut_range_slider
