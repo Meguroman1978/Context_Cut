@@ -1076,9 +1076,30 @@ def generate_professional_video(
                 if bg_opacity < 1.0:
                     bg_stream = bg_stream.filter('format', 'yuva420p').filter('colorchannelmixer', aa=bg_opacity)
                 
-                # 背景画像を配置（テキストと同じ位置に）
+                # 背景画像を配置
+                # プリセット位置の場合、式を含む座標をシンプルな配置に変換
+                is_preset = text_layer.get('is_preset_position', False)
                 bg_x = text_layer['x']
                 bg_y = text_layer['y']
+                bg_x_offset = text_layer.get('background_x_offset', 0)
+                bg_y_offset = text_layer.get('background_y_offset', 0)
+                
+                if is_preset:
+                    # プリセット位置の場合、中央配置を使用
+                    # overlayフィルター用の式に変換（text_w/text_hは使えない）
+                    if 'text_w' in str(bg_x) or 'text_h' in str(bg_y):
+                        # 中央配置: (main_w - overlay_w) / 2
+                        bg_x = f"(main_w-overlay_w)/2+{bg_x_offset}"
+                        bg_y = f"(main_h-overlay_h)/2+{bg_y_offset}"
+                    else:
+                        # 数値指定の場合はそのまま使用
+                        bg_x = str(bg_x)
+                        bg_y = str(bg_y)
+                else:
+                    # 数値指定の場合
+                    bg_x = str(bg_x)
+                    bg_y = str(bg_y)
+                
                 bg_enable_expr = f"between(t,{text_layer['start']},{text_layer['end']})"
                 
                 video_stream = video_stream.overlay(
@@ -2206,6 +2227,16 @@ def main():
                             y = str(text_y_px)
                         
                         if st.button("➕ テキストレイヤーを追加", type="primary"):
+                            # 背景画像用の位置を計算（プリセット位置の場合）
+                            bg_x_offset = 0
+                            bg_y_offset = 0
+                            
+                            # プリセット位置の場合、背景を中央配置にするためのオフセット
+                            if position_mode == "🎯 プリセット" and text_bg_path:
+                                if text_position in ["下部中央", "上部中央", "中央"]:
+                                    # 中央寄せの場合、背景も中央に配置
+                                    bg_x_offset = -50  # 背景を少し左にオフセット
+                                
                             new_layer = {
                                 'type': 'text',
                                 'content': text_content,
@@ -2219,7 +2250,10 @@ def main():
                                 'animation': 'none',
                                 'background_image': text_bg_path,
                                 'background_scale': text_bg_scale,
-                                'background_opacity': text_bg_opacity
+                                'background_opacity': text_bg_opacity,
+                                'background_x_offset': bg_x_offset,
+                                'background_y_offset': bg_y_offset,
+                                'is_preset_position': position_mode == "🎯 プリセット"
                             }
                             st.session_state.pro_layers.append(new_layer)
                             st.success(f"✅ テキストレイヤーを追加しました！")
