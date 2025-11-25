@@ -1057,39 +1057,6 @@ def generate_professional_video(
                 format='auto'
             )
         
-            # アニメーション適用
-            animation = sticker.get('animation', 'none')
-            overlay_x = sticker['x']
-            overlay_y = sticker['y']
-            enable_expr = f"between(t,{sticker['start']},{sticker['end']})"
-            
-            # アニメーション
-            if animation == 'fade_in':
-                sticker_stream = sticker_stream.filter('fade', type='in', start_time=0, duration=0.5)
-            elif animation == 'fade_out':
-                duration = sticker['end'] - sticker['start']
-                sticker_stream = sticker_stream.filter('fade', type='out', start_time=max(0, duration - 0.5), duration=0.5)
-            elif animation == 'fade_in_out':
-                duration = sticker['end'] - sticker['start']
-                sticker_stream = sticker_stream.filter('fade', type='in', start_time=0, duration=0.5)
-                sticker_stream = sticker_stream.filter('fade', type='out', start_time=max(0, duration - 0.5), duration=0.5)
-            elif animation == 'slide_in_left':
-                overlay_x = f"if(lt(t-{sticker['start']},0.5),-w+(t-{sticker['start']})*w/0.5,{overlay_x})"
-            elif animation == 'slide_in_right':
-                overlay_x = f"if(lt(t-{sticker['start']},0.5),main_w-(t-{sticker['start']})*w/0.5,{overlay_x})"
-            elif animation == 'slide_in_top':
-                overlay_y = f"if(lt(t-{sticker['start']},0.5),-h+(t-{sticker['start']})*h/0.5,{overlay_y})"
-            elif animation == 'slide_in_bottom':
-                overlay_y = f"if(lt(t-{sticker['start']},0.5),main_h-(t-{sticker['start']})*h/0.5,{overlay_y})"
-            
-            video_stream = video_stream.overlay(
-                sticker_stream,
-                x=overlay_x,
-                y=overlay_y,
-                enable=enable_expr,
-                format='auto'
-            )
-        
         # テキストレイヤー
         text_layers = [l for l in layers if l['type'] == 'text']
         for text_layer in text_layers:
@@ -1143,33 +1110,6 @@ def generate_professional_video(
                 enable=enable_expr
             )
         
-        # エフェクト
-        speed = effects.get('speed', 1.0)
-        brightness = effects.get('brightness', 0.0)
-        contrast = effects.get('contrast', 1.0)
-        saturation = effects.get('saturation', 1.0)
-        
-        # 速度調整
-        if speed != 1.0:
-            video_stream = video_stream.filter('setpts', f'{1/speed}*PTS')
-            if speed <= 2.0:  # 2倍速以下の場合のみ音声も調整
-                audio_stream = audio_stream.filter('atempo', speed)
-        
-        # カラーフィルター
-        if brightness != 0.0 or contrast != 1.0 or saturation != 1.0:
-            video_stream = video_stream.filter('eq', brightness=brightness, contrast=contrast, saturation=saturation)
-        
-        # ステッカー・画像
-        sticker_layers = [l for l in layers if l['type'] == 'sticker']
-        for sticker in sticker_layers:
-            sticker_path = str(Path(sticker['path']).absolute()).replace("\\", "/")
-            sticker_stream = ffmpeg.input(sticker_path, loop=1, t=end_time - start_time)
-            
-            # スケール調整
-            scale = sticker.get('scale', 1.0)
-            if scale != 1.0:
-                sticker_stream = sticker_stream.filter('scale', f'iw*{scale}', f'ih*{scale}')
-            
         # オーディオ
         bgm_path = audio_settings.get('bgm_path')
         if bgm_path and Path(bgm_path).exists():
