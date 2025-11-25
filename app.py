@@ -41,17 +41,52 @@ CHROMADB_DIR = Path("./chromadb_data")
 for dir_path in [FONTS_DIR, TEMP_VIDEOS_DIR, CHROMADB_DIR]:
     dir_path.mkdir(exist_ok=True, parents=True)
 
-# デフォルトフォントの確認とダウンロード
-DEFAULT_FONT = FONTS_DIR / "NotoSansJP-Regular.ttf"
-if not DEFAULT_FONT.exists():
-    st.warning("デフォルトフォントが見つかりません。初回起動時にダウンロードします...")
-    try:
-        import urllib.request
-        font_url = "https://github.com/notofonts/noto-cjk/raw/main/Sans/OTF/Japanese/NotoSansJP-Regular.otf"
-        urllib.request.urlretrieve(font_url, str(DEFAULT_FONT))
-        st.success("フォントのダウンロードが完了しました!")
-    except Exception as e:
-        st.error(f"フォントのダウンロードに失敗しました: {e}")
+# 日本語フォントライブラリ（Google Fonts - 商用利用可能）
+JAPANESE_FONTS = {
+    "Noto Sans JP": "https://github.com/google/fonts/raw/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf",
+    "Noto Serif JP": "https://github.com/google/fonts/raw/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf",
+    "M PLUS 1p": "https://github.com/google/fonts/raw/main/ofl/mplus1p/MPLUS1p-Regular.ttf",
+    "M PLUS Rounded 1c": "https://github.com/google/fonts/raw/main/ofl/mplusrounded1c/MPLUSRounded1c-Regular.ttf",
+    "Zen Kaku Gothic New": "https://github.com/google/fonts/raw/main/ofl/zenkakugothicnew/ZenKakuGothicNew-Regular.ttf",
+    "Zen Maru Gothic": "https://github.com/google/fonts/raw/main/ofl/zenmarugothic/ZenMaruGothic-Regular.ttf",
+    "Kosugi Maru": "https://github.com/google/fonts/raw/main/apache/kosugimaru/KosugiMaru-Regular.ttf",
+    "Kosugi": "https://github.com/google/fonts/raw/main/apache/kosugi/Kosugi-Regular.ttf",
+    "Sawarabi Gothic": "https://github.com/google/fonts/raw/main/ofl/sawarabigothic/SawarabiGothic-Regular.ttf",
+    "Sawarabi Mincho": "https://github.com/google/fonts/raw/main/ofl/sawarabimincho/SawarabiMincho-Regular.ttf",
+    "Hachi Maru Pop": "https://github.com/google/fonts/raw/main/ofl/hachimarupop/HachiMaruPop-Regular.ttf",
+    "Yusei Magic": "https://github.com/google/fonts/raw/main/ofl/yuseimagic/YuseiMagic-Regular.ttf",
+    "Reggae One": "https://github.com/google/fonts/raw/main/ofl/reggaeone/ReggaeOne-Regular.ttf",
+    "Rampart One": "https://github.com/google/fonts/raw/main/ofl/rampartone/RampartOne-Regular.ttf",
+    "Klee One": "https://github.com/google/fonts/raw/main/ofl/kleeone/KleeOne-Regular.ttf"
+}
+
+def download_japanese_fonts():
+    """日本語フォントを一括ダウンロード"""
+    import urllib.request
+    import time
+    
+    downloaded_count = 0
+    for font_name, font_url in JAPANESE_FONTS.items():
+        font_filename = font_name.replace(" ", "_") + ".ttf"
+        font_path = FONTS_DIR / font_filename
+        
+        if not font_path.exists():
+            try:
+                urllib.request.urlretrieve(font_url, str(font_path))
+                downloaded_count += 1
+                time.sleep(0.5)  # レート制限対策
+            except Exception as e:
+                print(f"フォント {font_name} のダウンロード失敗: {e}")
+    
+    return downloaded_count
+
+# 初回起動時にフォントをダウンロード
+if not (FONTS_DIR / "Noto_Sans_JP.ttf").exists():
+    print("日本語フォントを初期化中...")
+    downloaded = download_japanese_fonts()
+    print(f"{downloaded}個のフォントをダウンロードしました")
+
+DEFAULT_FONT = FONTS_DIR / "Noto_Sans_JP.ttf"
 
 # ============================
 # ユーティリティ関数
@@ -68,6 +103,41 @@ def get_available_fonts() -> List[str]:
                 fonts.append(font_file.name)
     
     return sorted(fonts)
+
+
+def get_japanese_fonts_dict() -> Dict[str, str]:
+    """日本語フォント名とファイル名のマッピングを取得"""
+    fonts_dict = {}
+    for font_name in JAPANESE_FONTS.keys():
+        font_filename = font_name.replace(" ", "_") + ".ttf"
+        font_path = FONTS_DIR / font_filename
+        if font_path.exists():
+            fonts_dict[font_name] = font_filename
+    return fonts_dict
+
+
+def generate_font_preview(font_path: str, text: str = "あいうえお ABC 123", size: int = 36) -> 'Image':
+    """フォントのプレビュー画像を生成"""
+    from PIL import Image, ImageDraw, ImageFont
+    
+    try:
+        # プレビュー画像を作成
+        img = Image.new('RGB', (500, 100), color='white')
+        draw = ImageDraw.Draw(img)
+        
+        # フォントを読み込み
+        font = ImageFont.truetype(str(font_path), size)
+        
+        # テキストを描画
+        draw.text((10, 30), text, font=font, fill='black')
+        
+        return img
+    except Exception as e:
+        # エラー時は空の画像を返す
+        img = Image.new('RGB', (500, 100), color='lightgray')
+        draw = ImageDraw.Draw(img)
+        draw.text((10, 40), f"プレビュー生成失敗: {e}", fill='red')
+        return img
 
 
 def save_uploaded_font(uploaded_file) -> bool:
@@ -770,6 +840,43 @@ def create_preview_clip(video_path: str, start_time: float, end_time: float, out
         return False
 
 
+def extract_video_thumbnail(video_path: str, time: float = 0.0) -> Optional['Image']:
+    """動画から指定時間のサムネイル画像を抽出"""
+    from PIL import Image
+    import tempfile
+    
+    try:
+        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
+            tmp_path = tmp_file.name
+        
+        # FFmpegでフレームを抽出
+        (
+            ffmpeg
+            .input(video_path, ss=time)
+            .output(tmp_path, vframes=1, format='image2', vcodec='mjpeg')
+            .overwrite_output()
+            .run(capture_stdout=True, capture_stderr=True, quiet=True)
+        )
+        
+        # 画像を読み込み
+        img = Image.open(tmp_path)
+        
+        # リサイズ（600px幅に）
+        aspect_ratio = img.height / img.width
+        new_width = 600
+        new_height = int(new_width * aspect_ratio)
+        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        # 一時ファイル削除
+        import os
+        os.unlink(tmp_path)
+        
+        return img
+    except Exception as e:
+        st.error(f"サムネイル抽出に失敗: {e}")
+        return None
+
+
 def get_background_settings(background_type: str):
     """背景タイプから設定を取得
     
@@ -923,8 +1030,9 @@ def generate_professional_video(
         # Phase 1: テキストレイヤー
         text_layers = [l for l in layers if l['type'] == 'text']
         for text_layer in text_layers:
-            # フォントパス
-            font_path = str(FONTS_DIR / "NotoSansJP-Regular.ttf").replace("\\", "/")
+            # フォントパス（レイヤーに指定されたフォントを使用）
+            font_file = text_layer.get('font_file', 'Noto_Sans_JP.ttf')
+            font_path = str(FONTS_DIR / font_file).replace("\\", "/")
             
             # テキストのエスケープ
             escaped_text = text_layer['content'].replace("\\", "\\\\\\\\")
@@ -2531,6 +2639,29 @@ def main():
                     with st.expander("➕ 新しいテキストレイヤーを追加", expanded=False):
                         text_content = st.text_area("テキスト内容", "ここにテキストを入力", height=100, key="new_text_content")
                         
+                        # フォント選択（プレビュー付き）
+                        st.write("**🎨 フォント選択**")
+                        japanese_fonts = get_japanese_fonts_dict()
+                        
+                        if japanese_fonts:
+                            selected_font_name = st.selectbox(
+                                "フォント",
+                                list(japanese_fonts.keys()),
+                                key="new_text_font_select"
+                            )
+                            selected_font_file = japanese_fonts[selected_font_name]
+                            
+                            # フォントプレビュー
+                            font_path = FONTS_DIR / selected_font_file
+                            if font_path.exists():
+                                preview_img = generate_font_preview(str(font_path), text_content if text_content else "あいうえお ABC 123")
+                                st.image(preview_img, caption=f"{selected_font_name} のプレビュー", use_container_width=True)
+                        else:
+                            st.warning("日本語フォントが見つかりません。デフォルトフォントを使用します。")
+                            selected_font_file = "Noto_Sans_JP.ttf"
+                        
+                        st.markdown("---")
+                        
                         col_t1, col_t2 = st.columns(2)
                         with col_t1:
                             text_start = st.number_input("開始時間（秒）", 0.0, clip_duration, 0.0, 0.1, key="new_text_start")
@@ -2543,22 +2674,44 @@ def main():
                         with col_t4:
                             text_color = st.color_picker("文字色", "#FFFFFF", key="new_text_color")
                         
-                        text_position = st.selectbox(
-                            "位置",
-                            ["下部中央", "上部中央", "中央", "左下", "右下"],
-                            key="new_text_position"
+                        # 位置調整（プリセット or 数値入力）
+                        st.write("**📍 位置設定**")
+                        position_mode = st.radio(
+                            "位置設定方法",
+                            ["🎯 プリセット", "🔢 数値指定（ピクセル）"],
+                            key="new_text_position_mode",
+                            horizontal=True
                         )
                         
-                        if st.button("➕ テキストレイヤーを追加", type="primary"):
+                        if position_mode == "🎯 プリセット":
+                            text_position = st.selectbox(
+                                "位置",
+                                ["下部中央", "上部中央", "中央", "左上", "右上", "左下", "右下"],
+                                key="new_text_position"
+                            )
                             position_map = {
                                 "下部中央": ("(w-text_w)/2", "h-text_h-50"),
                                 "上部中央": ("(w-text_w)/2", "50"),
                                 "中央": ("(w-text_w)/2", "(h-text_h)/2"),
+                                "左上": ("50", "50"),
+                                "右上": ("w-text_w-50", "50"),
                                 "左下": ("50", "h-text_h-50"),
                                 "右下": ("w-text_w-50", "h-text_h-50")
                             }
                             x, y = position_map[text_position]
+                        else:
+                            # 数値で直接指定
+                            st.info("💡 座標は左上角が(0, 0)です。動画サイズを考慮して指定してください。")
+                            col_x, col_y = st.columns(2)
+                            with col_x:
+                                text_x_px = st.number_input("X座標（px）", 0, 2000, 100, 10, key="new_text_x_px")
+                            with col_y:
+                                text_y_px = st.number_input("Y座標（px）", 0, 2000, 500, 10, key="new_text_y_px")
                             
+                            x = str(text_x_px)
+                            y = str(text_y_px)
+                        
+                        if st.button("➕ テキストレイヤーを追加", type="primary"):
                             st.session_state.pro_layers.append({
                                 'type': 'text',
                                 'content': text_content,
@@ -2568,6 +2721,7 @@ def main():
                                 'y': y,
                                 'font_size': text_size,
                                 'color': text_color,
+                                'font_file': selected_font_file,
                                 'animation': 'none'
                             })
                             st.success(f"✅ テキストレイヤーを追加しました！")
@@ -2621,16 +2775,22 @@ def main():
                             with col_s2:
                                 sticker_end = st.number_input("終了時間（秒）", sticker_start, clip_duration, min(sticker_start + 3.0, clip_duration), 0.1, key="new_sticker_end")
                             
-                            sticker_position = st.selectbox(
-                                "位置",
-                                ["下部中央", "上部中央", "中央", "左上", "右上", "左下", "右下"],
-                                key="new_sticker_position"
+                            # 位置調整
+                            st.write("**📍 位置設定**")
+                            sticker_position_mode = st.radio(
+                                "位置設定方法",
+                                ["🎯 プリセット", "🔢 数値指定（ピクセル）"],
+                                key="new_sticker_position_mode",
+                                horizontal=True
                             )
                             
-                            sticker_scale = st.slider("サイズ（%）", 10, 200, 100, 5, key="new_sticker_scale")
-                            
-                            if st.button("➕ ステッカーを追加", type="primary"):
-                                position_map = {
+                            if sticker_position_mode == "🎯 プリセット":
+                                sticker_position = st.selectbox(
+                                    "位置",
+                                    ["下部中央", "上部中央", "中央", "左上", "右上", "左下", "右下"],
+                                    key="new_sticker_position"
+                                )
+                                sticker_position_map = {
                                     "下部中央": ("(main_w-overlay_w)/2", "main_h-overlay_h-50"),
                                     "上部中央": ("(main_w-overlay_w)/2", "50"),
                                     "中央": ("(main_w-overlay_w)/2", "(main_h-overlay_h)/2"),
@@ -2639,15 +2799,28 @@ def main():
                                     "左下": ("50", "main_h-overlay_h-50"),
                                     "右下": ("main_w-overlay_w-50", "main_h-overlay_h-50")
                                 }
-                                x, y = position_map[sticker_position]
+                                sticker_x, sticker_y = sticker_position_map[sticker_position]
+                            else:
+                                st.info("💡 座標は左上角が(0, 0)です。動画サイズを考慮して指定してください。")
+                                col_sx, col_sy = st.columns(2)
+                                with col_sx:
+                                    sticker_x_px = st.number_input("X座標（px）", 0, 2000, 100, 10, key="new_sticker_x_px")
+                                with col_sy:
+                                    sticker_y_px = st.number_input("Y座標（px）", 0, 2000, 500, 10, key="new_sticker_y_px")
                                 
+                                sticker_x = str(sticker_x_px)
+                                sticker_y = str(sticker_y_px)
+                            
+                            sticker_scale = st.slider("サイズ（%）", 10, 200, 100, 5, key="new_sticker_scale")
+                            
+                            if st.button("➕ ステッカーを追加", type="primary"):
                                 st.session_state.pro_layers.append({
                                     'type': 'sticker',
                                     'path': str(sticker_path),
                                     'start': sticker_start,
                                     'end': sticker_end,
-                                    'x': x,
-                                    'y': y,
+                                    'x': sticker_x,
+                                    'y': sticker_y,
                                     'scale': sticker_scale / 100.0,
                                     'animation': 'none'
                                 })
