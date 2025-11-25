@@ -1733,7 +1733,7 @@ def main():
     if st.session_state.video_path and st.session_state.transcription is not None:
         
         # タブUIの選択状態を管理
-        tab_names = ["🔍 シーン検索", "🎬 プロ編集"]
+        tab_names = ["🔍 シーン検索", "🎬 動画編集"]
         
         # タブの選択を制御
         if 'force_tab_index' in st.session_state:
@@ -1850,18 +1850,15 @@ def main():
                                 if st.button(f"✂️ 選択", key=f"select_{i}", use_container_width=True):
                                     st.session_state.selected_start = scene['start']
                                     st.session_state.selected_end = scene['end']
-                                    st.session_state.clip_start = scene['start']  # プロ編集用
-                                    st.session_state.clip_end = scene['end']  # プロ編集用
+                                    st.session_state.clip_start = scene['start']  # 動画編集用
+                                    st.session_state.clip_end = scene['end']  # 動画編集用
                                     st.session_state.scene_selected = True
-                                    st.success(f"✅ シーンを選択しました！「🎬 プロ編集」タブで編集できます。")
+                                    st.success(f"✅ シーンを選択しました！「🎬 動画編集」タブで編集できます。")
                                     st.rerun()
         
         # タブ2: プロフェッショナル編集
         with tab2:
-            st.header("🎬 プロフェッショナル動画編集")
-            st.info("💡 **全Phase統合版**: タイムライン、マルチレイヤー、ステッカー、エフェクト、BGM、アニメーション")
-            
-            st.info("💡 **全Phase統合版**: タイムライン、マルチレイヤー、ステッカー、エフェクト、BGM、アニメーション")
+            st.header("🎬 動画編集")
             
             # シーン選択またはカット範囲指定から範囲を取得
             has_clip_range = 'clip_start' in st.session_state and 'clip_end' in st.session_state
@@ -1977,32 +1974,203 @@ def main():
                     
                     st.markdown("---")
                     
-                    # テキストレイヤー
-                    # 既存レイヤーの表示
-                    if st.session_state.pro_layers:
-                        st.write(f"**📚 レイヤー一覧** ({len(st.session_state.pro_layers)}個)")
+                    # レイヤー一覧
+                    # 既存レイヤーとBGMの表示
+                    total_items = len(st.session_state.pro_layers)
+                    if st.session_state.pro_audio.get('bgm_path'):
+                        total_items += 1
+                    
+                    if total_items > 0:
+                        st.write(f"**📚 レイヤー一覧** ({total_items}個)")
                         
+                        # 統合タイムラインスライダー（ビジュアライゼーション）
+                        st.write("**🎬 統合タイムライン**")
+                        
+                        # タイムラインの高さを動的に計算（レイヤー数に応じて）
+                        timeline_height = max(150, total_items * 40)
+                        
+                        # HTMLとCSSで統合タイムラインを描画
+                        timeline_html = f"""
+                        <style>
+                        .timeline-container {{
+                            position: relative;
+                            width: 100%;
+                            height: {timeline_height}px;
+                            background: linear-gradient(90deg, #f0f0f0 0%, #e0e0e0 100%);
+                            border-radius: 10px;
+                            margin: 10px 0;
+                            padding: 10px;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        }}
+                        .timeline-track {{
+                            position: absolute;
+                            height: 30px;
+                            border-radius: 5px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 11px;
+                            font-weight: bold;
+                            color: white;
+                            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            white-space: nowrap;
+                            padding: 0 5px;
+                        }}
+                        .timeline-label {{
+                            position: absolute;
+                            left: 0;
+                            font-size: 10px;
+                            color: #666;
+                            white-space: nowrap;
+                        }}
+                        </style>
+                        <div class="timeline-container">
+                        """
+                        
+                        # 各レイヤーをタイムライン上に配置
+                        y_offset = 5
                         for i, layer in enumerate(st.session_state.pro_layers):
-                            with st.expander(f"{'📝' if layer['type'] == 'text' else '🖼️' if layer['type'] == 'sticker' else '🎵'} レイヤー {i+1}: {layer['type'].upper()}", expanded=False):
+                            start_pct = (layer['start'] / clip_duration) * 100
+                            width_pct = ((layer['end'] - layer['start']) / clip_duration) * 100
+                            
+                            if layer['type'] == 'text':
+                                color = "#4CAF50"
+                                icon = "📝"
+                                label = f"{layer['content'][:15]}..."
+                            else:
+                                color = "#2196F3"
+                                icon = "🖼️"
+                                label = Path(layer['path']).stem[:15]
+                            
+                            # アニメーション情報を追加
+                            anim = layer.get('animation', 'none')
+                            anim_text = ""
+                            if anim != 'none':
+                                anim_map = {
+                                    'fade_in': '📈',
+                                    'fade_out': '📉',
+                                    'fade_in_out': '🔄',
+                                    'slide_in_left': '⬅️',
+                                    'slide_in_right': '➡️',
+                                    'slide_in_top': '⬆️',
+                                    'slide_in_bottom': '⬇️'
+                                }
+                                anim_text = f" {anim_map.get(anim, '✨')}"
+                            
+                            timeline_html += f"""
+                            <div class="timeline-track" style="left: {start_pct}%; width: {width_pct}%; top: {y_offset}px; background: {color};">
+                                {icon} {label}{anim_text}
+                            </div>
+                            <div class="timeline-label" style="top: {y_offset}px; left: 2px;">
+                                レイヤー{i+1}
+                            </div>
+                            """
+                            y_offset += 35
+                        
+                        # BGMトラックを追加
+                        if st.session_state.pro_audio.get('bgm_path'):
+                            bgm_start = st.session_state.pro_audio.get('bgm_start', 0.0)
+                            bgm_end = st.session_state.pro_audio.get('bgm_end', clip_duration)
+                            start_pct = (bgm_start / clip_duration) * 100
+                            width_pct = ((bgm_end - bgm_start) / clip_duration) * 100
+                            
+                            timeline_html += f"""
+                            <div class="timeline-track" style="left: {start_pct}%; width: {width_pct}%; top: {y_offset}px; background: #FF9800;">
+                                🎵 BGM
+                            </div>
+                            <div class="timeline-label" style="top: {y_offset}px; left: 2px;">
+                                BGM
+                            </div>
+                            """
+                        
+                        timeline_html += "</div>"
+                        st.markdown(timeline_html, unsafe_allow_html=True)
+                        
+                        # タイムライン凡例
+                        st.caption(f"💡 動画全体: 0.0秒 〜 {clip_duration:.1f}秒 | 📈=フェードイン 📉=フェードアウト ⬅️➡️⬆️⬇️=スライドイン")
+                        
+                        st.markdown("---")
+                        
+                        # 個別レイヤーの詳細と微調整
+                        for i, layer in enumerate(st.session_state.pro_layers):
+                            anim = layer.get('animation', 'none')
+                            anim_icon = ""
+                            if anim != 'none':
+                                anim_map = {
+                                    'fade_in': '📈',
+                                    'fade_out': '📉',
+                                    'fade_in_out': '🔄',
+                                    'slide_in_left': '⬅️',
+                                    'slide_in_right': '➡️',
+                                    'slide_in_top': '⬆️',
+                                    'slide_in_bottom': '⬇️'
+                                }
+                                anim_icon = f" {anim_map.get(anim, '✨')}"
+                            
+                            with st.expander(f"{'📝' if layer['type'] == 'text' else '🖼️'} レイヤー {i+1}: {layer['type'].upper()}{anim_icon}", expanded=False):
                                 col_l1, col_l2 = st.columns([3, 1])
                                 
                                 with col_l1:
                                     if layer['type'] == 'text':
                                         st.text_area("内容", layer['content'], height=60, key=f"layer_content_{i}", disabled=True)
-                                        st.write(f"⏱️ {layer['start']:.1f}秒 〜 {layer['end']:.1f}秒")
                                         st.write(f"🎨 サイズ: {layer['font_size']}px, 色: {layer['color']}")
                                     elif layer['type'] == 'sticker':
                                         st.write(f"📁 ファイル: {Path(layer['path']).name}")
-                                        st.write(f"⏱️ {layer['start']:.1f}秒 〜 {layer['end']:.1f}秒")
                                         st.write(f"📐 位置: X={layer['x']}, Y={layer['y']}")
                                         if layer.get('scale', 1.0) != 1.0:
                                             st.write(f"🔍 スケール: {layer['scale']*100:.0f}%")
+                                    
+                                    # アニメーション情報を表示
+                                    if anim != 'none':
+                                        anim_names = {
+                                            'fade_in': 'フェードイン',
+                                            'fade_out': 'フェードアウト',
+                                            'fade_in_out': 'フェードイン＆アウト',
+                                            'slide_in_left': '左からスライドイン',
+                                            'slide_in_right': '右からスライドイン',
+                                            'slide_in_top': '上からスライドイン',
+                                            'slide_in_bottom': '下からスライドイン'
+                                        }
+                                        st.info(f"✨ アニメーション: {anim_names.get(anim, anim)}")
+                                    
+                                    # タイムライン微調整スライダー
+                                    st.write("**⏱️ タイムライン微調整**")
+                                    layer_time_range = st.slider(
+                                        "表示時間",
+                                        min_value=0.0,
+                                        max_value=clip_duration,
+                                        value=(layer['start'], layer['end']),
+                                        step=0.1,
+                                        key=f"layer_time_{i}"
+                                    )
+                                    
+                                    if layer_time_range != (layer['start'], layer['end']):
+                                        if st.button("⏱️ 時間を更新", key=f"update_layer_time_{i}"):
+                                            st.session_state.pro_layers[i]['start'] = layer_time_range[0]
+                                            st.session_state.pro_layers[i]['end'] = layer_time_range[1]
+                                            st.success(f"✅ レイヤー{i+1}の時間を更新しました")
+                                            st.rerun()
+                                    else:
+                                        st.write(f"⏱️ {layer['start']:.1f}秒 〜 {layer['end']:.1f}秒")
                                 
                                 with col_l2:
                                     if st.button("🗑️ 削除", key=f"delete_layer_{i}"):
                                         st.session_state.pro_layers.pop(i)
                                         st.success("削除しました")
                                         st.rerun()
+                        
+                        # BGMの詳細表示
+                        if st.session_state.pro_audio.get('bgm_path'):
+                            st.markdown("---")
+                            with st.expander("🎵 BGM情報", expanded=False):
+                                bgm_start = st.session_state.pro_audio.get('bgm_start', 0.0)
+                                bgm_end = st.session_state.pro_audio.get('bgm_end', clip_duration)
+                                st.write(f"📁 ファイル: {Path(st.session_state.pro_audio['bgm_path']).name}")
+                                st.write(f"⏱️ {bgm_start:.1f}秒 〜 {bgm_end:.1f}秒")
+                                st.write(f"🔊 BGM音量: {st.session_state.pro_audio.get('bgm_volume', 0.5)*100:.0f}%")
+                                st.write(f"🔊 元音声音量: {st.session_state.pro_audio.get('original_volume', 1.0)*100:.0f}%")
                     
                     st.markdown("---")
 
@@ -2473,9 +2641,29 @@ def main():
                         # 編集状況サマリー
                         st.markdown("---")
                         st.write("**📊 編集状況**")
-                        st.metric("テキストレイヤー", len([l for l in st.session_state.pro_layers if l['type'] == 'text']))
-                        st.metric("ステッカーレイヤー", len([l for l in st.session_state.pro_layers if l['type'] == 'sticker']))
-                        st.metric("BGM", "あり" if st.session_state.pro_audio['bgm_path'] else "なし")
+                        
+                        # テキストレイヤー数
+                        text_layers = [l for l in st.session_state.pro_layers if l['type'] == 'text']
+                        st.metric("テキストレイヤー", len(text_layers))
+                        
+                        # ステッカーレイヤー数
+                        sticker_layers = [l for l in st.session_state.pro_layers if l['type'] == 'sticker']
+                        st.metric("ステッカーレイヤー", len(sticker_layers))
+                        
+                        # アニメーション数
+                        animated_layers = [l for l in st.session_state.pro_layers if l.get('animation', 'none') != 'none']
+                        if animated_layers:
+                            st.metric("✨ アニメーション", f"{len(animated_layers)}個")
+                        
+                        # BGM情報
+                        if st.session_state.pro_audio['bgm_path']:
+                            bgm_start = st.session_state.pro_audio.get('bgm_start', 0.0)
+                            bgm_end = st.session_state.pro_audio.get('bgm_end', clip_duration)
+                            st.metric("🎵 BGM", f"{bgm_start:.1f}秒〜{bgm_end:.1f}秒")
+                        else:
+                            st.metric("BGM", "なし")
+                        
+                        # エフェクト
                         st.metric("エフェクト", "適用中" if st.session_state.pro_effects['speed'] != 1.0 or st.session_state.pro_effects['brightness'] != 0.0 else "なし")
                     
                     st.markdown('</div>', unsafe_allow_html=True)
@@ -2578,8 +2766,8 @@ def main():
                     # 調整後の値を選択
                     st.session_state.selected_start = st.session_state.dialog_adjusted_start
                     st.session_state.selected_end = st.session_state.dialog_adjusted_end
-                    st.session_state.clip_start = st.session_state.dialog_adjusted_start  # プロ編集用
-                    st.session_state.clip_end = st.session_state.dialog_adjusted_end  # プロ編集用
+                    st.session_state.clip_start = st.session_state.dialog_adjusted_start  # 動画編集用
+                    st.session_state.clip_end = st.session_state.dialog_adjusted_end  # 動画編集用
                     st.session_state.scene_preview_dialog_open = False
                     st.session_state.scene_selected = True
                     # スライダーの値をクリアして新しい値を反映させる
