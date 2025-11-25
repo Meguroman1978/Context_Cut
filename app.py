@@ -842,6 +842,180 @@ def get_background_settings(background_type: str):
         return {'mode': 'simple', 'balloon_image': None, 'box': 0, 'boxcolor': "black@0.0", 'boxborderw': 0}
 
 
+def generate_professional_video(
+    video_path: str,
+    start_time: float,
+    end_time: float,
+    output_path: str,
+    layers: List[Dict],
+    effects: Dict,
+    audio_settings: Dict
+) -> bool:
+    """プロフェッショナル動画編集（Phase 1-5統合版）"""
+    try:
+        import streamlit as st
+        
+        # 入力動画
+        input_stream = ffmpeg.input(video_path, ss=start_time, to=end_time)
+        video_stream = input_stream.video
+        audio_stream = input_stream.audio
+        
+        # Phase 3: エフェクト適用
+        speed = effects.get('speed', 1.0)
+        brightness = effects.get('brightness', 0.0)
+        contrast = effects.get('contrast', 1.0)
+        saturation = effects.get('saturation', 1.0)
+        
+        # 速度調整
+        if speed != 1.0:
+            video_stream = video_stream.filter('setpts', f'{1/speed}*PTS')
+            if speed <= 2.0:  # 2倍速以下の場合のみ音声も調整
+                audio_stream = audio_stream.filter('atempo', speed)
+        
+        # カラーフィルター
+        if brightness != 0.0 or contrast != 1.0 or saturation != 1.0:
+            video_stream = video_stream.filter('eq', brightness=brightness, contrast=contrast, saturation=saturation)
+        
+        # Phase 2: ステッカー・画像オーバーレイ
+        sticker_layers = [l for l in layers if l['type'] == 'sticker']
+        for sticker in sticker_layers:
+            sticker_path = str(Path(sticker['path']).absolute()).replace("\\", "/")
+            sticker_stream = ffmpeg.input(sticker_path, loop=1, t=end_time - start_time)
+            
+            # スケール調整
+            scale = sticker.get('scale', 1.0)
+            if scale != 1.0:
+                sticker_stream = sticker_stream.filter('scale', f'iw*{scale}', f'ih*{scale}')
+            
+            # アニメーション適用
+            animation = sticker.get('animation', 'none')
+            overlay_x = sticker['x']
+            overlay_y = sticker['y']
+            enable_expr = f"between(t,{sticker['start']},{sticker['end']})"
+            
+            # Phase 5: アニメーション
+            if animation == 'fade_in':
+                sticker_stream = sticker_stream.filter('fade', type='in', start_time=0, duration=0.5)
+            elif animation == 'fade_out':
+                duration = sticker['end'] - sticker['start']
+                sticker_stream = sticker_stream.filter('fade', type='out', start_time=max(0, duration - 0.5), duration=0.5)
+            elif animation == 'fade_in_out':
+                duration = sticker['end'] - sticker['start']
+                sticker_stream = sticker_stream.filter('fade', type='in', start_time=0, duration=0.5)
+                sticker_stream = sticker_stream.filter('fade', type='out', start_time=max(0, duration - 0.5), duration=0.5)
+            elif animation == 'slide_in_left':
+                overlay_x = f"if(lt(t-{sticker['start']},0.5),-w+(t-{sticker['start']})*w/0.5,{overlay_x})"
+            elif animation == 'slide_in_right':
+                overlay_x = f"if(lt(t-{sticker['start']},0.5),main_w-(t-{sticker['start']})*w/0.5,{overlay_x})"
+            elif animation == 'slide_in_top':
+                overlay_y = f"if(lt(t-{sticker['start']},0.5),-h+(t-{sticker['start']})*h/0.5,{overlay_y})"
+            elif animation == 'slide_in_bottom':
+                overlay_y = f"if(lt(t-{sticker['start']},0.5),main_h-(t-{sticker['start']})*h/0.5,{overlay_y})"
+            
+            video_stream = video_stream.overlay(
+                sticker_stream,
+                x=overlay_x,
+                y=overlay_y,
+                enable=enable_expr,
+                format='auto'
+            )
+        
+        # Phase 1: テキストレイヤー
+        text_layers = [l for l in layers if l['type'] == 'text']
+        for text_layer in text_layers:
+            # フォントパス
+            font_path = str(FONTS_DIR / "NotoSansJP-Regular.ttf").replace("\\", "/")
+            
+            # テキストのエスケープ
+            escaped_text = text_layer['content'].replace("\\", "\\\\\\\\")
+            escaped_text = escaped_text.replace("'", "'\\\\''")
+            escaped_text = escaped_text.replace(":", "\\:")
+            escaped_text = escaped_text.replace("\n", " ")
+            
+            # アニメーション適用
+            animation = text_layer.get('animation', 'none')
+            text_x = text_layer['x']
+            text_y = text_layer['y']
+            text_alpha = '1.0'
+            
+            # Phase 5: テキストアニメーション
+            if animation == 'fade_in':
+                # フェードイン: 最初の0.5秒で透明度を0→1
+                text_alpha = f"if(lt(t-{text_layer['start']},0.5),(t-{text_layer['start']})/0.5,1)"
+            elif animation == 'fade_out':
+                # フェードアウト: 最後の0.5秒で透明度を1→0
+                duration = text_layer['end'] - text_layer['start']
+                text_alpha = f"if(gt(t-{text_layer['start']},{duration-0.5}),1-((t-{text_layer['start']})-{duration-0.5})/0.5,1)"
+            elif animation == 'fade_in_out':
+                duration = text_layer['end'] - text_layer['start']
+                text_alpha = f"if(lt(t-{text_layer['start']},0.5),(t-{text_layer['start']})/0.5,if(gt(t-{text_layer['start']},{duration-0.5}),1-((t-{text_layer['start']})-{duration-0.5})/0.5,1))"
+            elif animation == 'slide_in_left':
+                text_x = f"if(lt(t-{text_layer['start']},0.5),-text_w+(t-{text_layer['start']})*text_w/0.5,{text_x})"
+            elif animation == 'slide_in_right':
+                text_x = f"if(lt(t-{text_layer['start']},0.5),w-(t-{text_layer['start']})*text_w/0.5,{text_x})"
+            elif animation == 'slide_in_top':
+                text_y = f"if(lt(t-{text_layer['start']},0.5),-text_h+(t-{text_layer['start']})*text_h/0.5,{text_y})"
+            elif animation == 'slide_in_bottom':
+                text_y = f"if(lt(t-{text_layer['start']},0.5),h-(t-{text_layer['start']})*text_h/0.5,{text_y})"
+            
+            enable_expr = f"between(t,{text_layer['start']},{text_layer['end']})"
+            
+            video_stream = video_stream.filter(
+                'drawtext',
+                text=escaped_text,
+                fontfile=font_path,
+                fontsize=text_layer['font_size'],
+                fontcolor=text_layer['color'],
+                x=text_x,
+                y=text_y,
+                alpha=text_alpha,
+                enable=enable_expr
+            )
+        
+        # Phase 4: オーディオミキシング
+        bgm_path = audio_settings.get('bgm_path')
+        if bgm_path and Path(bgm_path).exists():
+            # BGMを読み込み
+            bgm_stream = ffmpeg.input(bgm_path).audio
+            
+            # 音量調整
+            original_volume = audio_settings.get('original_volume', 1.0)
+            bgm_volume = audio_settings.get('bgm_volume', 0.5)
+            
+            audio_stream = audio_stream.filter('volume', original_volume)
+            bgm_stream = bgm_stream.filter('volume', bgm_volume)
+            
+            # BGMを動画の長さに合わせてループ
+            video_duration = end_time - start_time
+            bgm_stream = bgm_stream.filter('aloop', loop=-1, size=int(video_duration * 44100))
+            
+            # 2つの音声をミックス
+            audio_stream = ffmpeg.filter([audio_stream, bgm_stream], 'amix', inputs=2, duration='first')
+        
+        # 出力
+        output = ffmpeg.output(
+            video_stream,
+            audio_stream,
+            output_path,
+            vcodec='libx264',
+            acodec='aac',
+            audio_bitrate='192k',
+            **{'loglevel': 'warning', 'y': None}
+        )
+        
+        ffmpeg.run(output, overwrite_output=True, capture_stderr=True)
+        return True
+        
+    except ffmpeg.Error as e:
+        st.error(f"❌ プロフェッショナル動画生成に失敗しました: FFmpegエラー")
+        stderr_output = e.stderr.decode('utf-8') if e.stderr else "詳細なし"
+        st.error(f"詳細: {stderr_output}")
+        return False
+    except Exception as e:
+        st.error(f"❌ プロフェッショナル動画生成に失敗しました: {e}")
+        return False
+
+
 def generate_final_video_with_subtitle(
     video_path: str,
     start_time: float,
@@ -1344,7 +1518,7 @@ def main():
     if st.session_state.video_path and st.session_state.transcription is not None:
         
         # タブUIの選択状態を管理
-        tab_names = ["🔍 シーン検索", "✂️ カット範囲指定", "💬 テロップ編集"]
+        tab_names = ["🔍 シーン検索", "✂️ カット範囲指定", "💬 テロップ編集", "🎬 プロ編集"]
         
         # タブの選択を制御
         if 'force_tab_index' in st.session_state:
@@ -1353,7 +1527,7 @@ def main():
             st.session_state.active_tab = st.session_state.force_tab_index
             del st.session_state.force_tab_index
         
-        tab1, tab2, tab3 = st.tabs(tab_names)
+        tab1, tab2, tab3, tab4 = st.tabs(tab_names)
         
         # タブ1: シーン検索
         with tab1:
@@ -2276,6 +2450,456 @@ def main():
                                         file_name="context_cut_pro_output.mp4",
                                         mime="video/mp4"
                                     )
+        
+        # タブ4: プロフェッショナル編集
+        with tab4:
+            st.header("🎬 プロフェッショナル動画編集")
+            st.info("💡 **全Phase統合版**: タイムライン、マルチレイヤー、ステッカー、エフェクト、BGM、アニメーション")
+            
+            if 'clip_start' not in st.session_state:
+                st.warning("⚠️ まず「カット範囲指定」タブでプレビューを生成してください。")
+                st.info("プロフェッショナル編集を使用するには、動画の基本範囲を先に設定する必要があります。")
+            else:
+                # セッションステートの初期化
+                if 'pro_layers' not in st.session_state:
+                    st.session_state.pro_layers = []
+                if 'pro_effects' not in st.session_state:
+                    st.session_state.pro_effects = {
+                        'speed': 1.0,
+                        'brightness': 0.0,
+                        'contrast': 1.0,
+                        'saturation': 1.0
+                    }
+                if 'pro_audio' not in st.session_state:
+                    st.session_state.pro_audio = {
+                        'bgm_path': None,
+                        'bgm_volume': 0.5,
+                        'original_volume': 1.0
+                    }
+                
+                # 2カラムレイアウト: 左側に編集ツール、右側にプレビュー
+                col_tools, col_preview = st.columns([1.5, 1])
+                
+                with col_tools:
+                    # タイムライン情報
+                    st.subheader("⏱️ タイムライン")
+                    clip_start = st.session_state.clip_start
+                    clip_end = st.session_state.clip_end
+                    clip_duration = clip_end - clip_start
+                    
+                    col_t1, col_t2, col_t3 = st.columns(3)
+                    with col_t1:
+                        st.metric("開始", f"{clip_start:.1f}秒")
+                    with col_t2:
+                        st.metric("終了", f"{clip_end:.1f}秒")
+                    with col_t3:
+                        st.metric("長さ", f"{clip_duration:.1f}秒")
+                    
+                    # タイムライン範囲微調整
+                    with st.expander("🎯 タイムライン範囲の微調整", expanded=False):
+                        st.write("動画の開始・終了時間を0.1秒単位で調整できます")
+                        
+                        new_start = st.number_input(
+                            "開始時間（秒）",
+                            min_value=0.0,
+                            max_value=st.session_state.video_duration,
+                            value=float(clip_start),
+                            step=0.1,
+                            key="pro_timeline_start"
+                        )
+                        
+                        new_end = st.number_input(
+                            "終了時間（秒）",
+                            min_value=new_start + 0.1,
+                            max_value=st.session_state.video_duration,
+                            value=float(clip_end),
+                            step=0.1,
+                            key="pro_timeline_end"
+                        )
+                        
+                        if st.button("⏱️ タイムラインを適用"):
+                            st.session_state.clip_start = new_start
+                            st.session_state.clip_end = new_end
+                            st.success(f"✅ タイムラインを更新: {new_start:.1f}秒 〜 {new_end:.1f}秒")
+                            st.rerun()
+                    
+                    st.markdown("---")
+                    
+                    # Phase 1: マルチレイヤーテキスト
+                    st.subheader("📝 Phase 1: テキストレイヤー")
+                    
+                    with st.expander("➕ 新しいテキストレイヤーを追加", expanded=False):
+                        text_content = st.text_area("テキスト内容", "ここにテキストを入力", height=100, key="new_text_content")
+                        
+                        col_t1, col_t2 = st.columns(2)
+                        with col_t1:
+                            text_start = st.number_input("開始時間（秒）", 0.0, clip_duration, 0.0, 0.1, key="new_text_start")
+                        with col_t2:
+                            text_end = st.number_input("終了時間（秒）", text_start, clip_duration, min(text_start + 3.0, clip_duration), 0.1, key="new_text_end")
+                        
+                        col_t3, col_t4 = st.columns(2)
+                        with col_t3:
+                            text_size = st.slider("フォントサイズ", 24, 120, 48, key="new_text_size")
+                        with col_t4:
+                            text_color = st.color_picker("文字色", "#FFFFFF", key="new_text_color")
+                        
+                        text_position = st.selectbox(
+                            "位置",
+                            ["下部中央", "上部中央", "中央", "左下", "右下"],
+                            key="new_text_position"
+                        )
+                        
+                        if st.button("➕ テキストレイヤーを追加", type="primary"):
+                            position_map = {
+                                "下部中央": ("(w-text_w)/2", "h-text_h-50"),
+                                "上部中央": ("(w-text_w)/2", "50"),
+                                "中央": ("(w-text_w)/2", "(h-text_h)/2"),
+                                "左下": ("50", "h-text_h-50"),
+                                "右下": ("w-text_w-50", "h-text_h-50")
+                            }
+                            x, y = position_map[text_position]
+                            
+                            st.session_state.pro_layers.append({
+                                'type': 'text',
+                                'content': text_content,
+                                'start': text_start,
+                                'end': text_end,
+                                'x': x,
+                                'y': y,
+                                'font_size': text_size,
+                                'color': text_color,
+                                'animation': 'none'
+                            })
+                            st.success(f"✅ テキストレイヤーを追加しました！")
+                            st.rerun()
+                    
+                    # 既存レイヤーの表示
+                    if st.session_state.pro_layers:
+                        st.write(f"**📚 レイヤー一覧** ({len(st.session_state.pro_layers)}個)")
+                        
+                        for i, layer in enumerate(st.session_state.pro_layers):
+                            with st.expander(f"{'📝' if layer['type'] == 'text' else '🖼️' if layer['type'] == 'sticker' else '🎵'} レイヤー {i+1}: {layer['type'].upper()}", expanded=False):
+                                col_l1, col_l2 = st.columns([3, 1])
+                                
+                                with col_l1:
+                                    if layer['type'] == 'text':
+                                        st.text_area("内容", layer['content'], height=60, key=f"layer_content_{i}", disabled=True)
+                                        st.write(f"⏱️ {layer['start']:.1f}秒 〜 {layer['end']:.1f}秒")
+                                        st.write(f"🎨 サイズ: {layer['font_size']}px, 色: {layer['color']}")
+                                    elif layer['type'] == 'sticker':
+                                        st.write(f"📁 ファイル: {Path(layer['path']).name}")
+                                        st.write(f"⏱️ {layer['start']:.1f}秒 〜 {layer['end']:.1f}秒")
+                                        st.write(f"📐 位置: X={layer['x']}, Y={layer['y']}")
+                                        if layer.get('scale', 1.0) != 1.0:
+                                            st.write(f"🔍 スケール: {layer['scale']*100:.0f}%")
+                                
+                                with col_l2:
+                                    if st.button("🗑️ 削除", key=f"delete_layer_{i}"):
+                                        st.session_state.pro_layers.pop(i)
+                                        st.success("削除しました")
+                                        st.rerun()
+                    
+                    st.markdown("---")
+                    
+                    # Phase 2: ステッカー
+                    st.subheader("🖼️ Phase 2: ステッカー・画像")
+                    
+                    with st.expander("➕ 画像/ステッカーを追加", expanded=False):
+                        sticker_file = st.file_uploader("画像をアップロード（PNG, JPG, GIF）", type=['png', 'jpg', 'jpeg', 'gif'], key="new_sticker")
+                        
+                        if sticker_file:
+                            # 画像を保存
+                            sticker_path = TEMP_VIDEOS_DIR / f"sticker_{len(st.session_state.pro_layers)}_{sticker_file.name}"
+                            with open(sticker_path, 'wb') as f:
+                                f.write(sticker_file.getbuffer())
+                            
+                            st.image(sticker_path, caption="アップロードした画像", width=200)
+                            
+                            col_s1, col_s2 = st.columns(2)
+                            with col_s1:
+                                sticker_start = st.number_input("開始時間（秒）", 0.0, clip_duration, 0.0, 0.1, key="new_sticker_start")
+                            with col_s2:
+                                sticker_end = st.number_input("終了時間（秒）", sticker_start, clip_duration, min(sticker_start + 3.0, clip_duration), 0.1, key="new_sticker_end")
+                            
+                            sticker_position = st.selectbox(
+                                "位置",
+                                ["下部中央", "上部中央", "中央", "左上", "右上", "左下", "右下"],
+                                key="new_sticker_position"
+                            )
+                            
+                            sticker_scale = st.slider("サイズ（%）", 10, 200, 100, 5, key="new_sticker_scale")
+                            
+                            if st.button("➕ ステッカーを追加", type="primary"):
+                                position_map = {
+                                    "下部中央": ("(main_w-overlay_w)/2", "main_h-overlay_h-50"),
+                                    "上部中央": ("(main_w-overlay_w)/2", "50"),
+                                    "中央": ("(main_w-overlay_w)/2", "(main_h-overlay_h)/2"),
+                                    "左上": ("50", "50"),
+                                    "右上": ("main_w-overlay_w-50", "50"),
+                                    "左下": ("50", "main_h-overlay_h-50"),
+                                    "右下": ("main_w-overlay_w-50", "main_h-overlay_h-50")
+                                }
+                                x, y = position_map[sticker_position]
+                                
+                                st.session_state.pro_layers.append({
+                                    'type': 'sticker',
+                                    'path': str(sticker_path),
+                                    'start': sticker_start,
+                                    'end': sticker_end,
+                                    'x': x,
+                                    'y': y,
+                                    'scale': sticker_scale / 100.0,
+                                    'animation': 'none'
+                                })
+                                st.success(f"✅ ステッカーを追加しました！")
+                                st.rerun()
+                    
+                    st.markdown("---")
+                    
+                    # Phase 3: エフェクト
+                    st.subheader("⚡ Phase 3: エフェクト")
+                    
+                    with st.expander("⚡ 動画エフェクトを設定", expanded=False):
+                        st.write("**速度調整**")
+                        speed = st.slider(
+                            "再生速度",
+                            0.25, 4.0, 
+                            st.session_state.pro_effects['speed'],
+                            0.25,
+                            help="0.25x（超スロー）〜 4.0x（早送り）",
+                            key="effect_speed"
+                        )
+                        st.session_state.pro_effects['speed'] = speed
+                        
+                        if speed < 1.0:
+                            st.info(f"🐌 スローモーション: {speed}x速度")
+                        elif speed > 1.0:
+                            st.info(f"⚡ 早送り: {speed}x速度")
+                        
+                        st.markdown("---")
+                        st.write("**カラーフィルター**")
+                        
+                        brightness = st.slider(
+                            "明るさ",
+                            -1.0, 1.0,
+                            st.session_state.pro_effects['brightness'],
+                            0.1,
+                            key="effect_brightness"
+                        )
+                        st.session_state.pro_effects['brightness'] = brightness
+                        
+                        contrast = st.slider(
+                            "コントラスト",
+                            0.0, 3.0,
+                            st.session_state.pro_effects['contrast'],
+                            0.1,
+                            key="effect_contrast"
+                        )
+                        st.session_state.pro_effects['contrast'] = contrast
+                        
+                        saturation = st.slider(
+                            "彩度",
+                            0.0, 3.0,
+                            st.session_state.pro_effects['saturation'],
+                            0.1,
+                            key="effect_saturation"
+                        )
+                        st.session_state.pro_effects['saturation'] = saturation
+                        
+                        # エフェクトプリセット
+                        st.markdown("---")
+                        st.write("**クイックプリセット**")
+                        
+                        col_p1, col_p2, col_p3 = st.columns(3)
+                        with col_p1:
+                            if st.button("🌅 ヴィンテージ"):
+                                st.session_state.pro_effects['brightness'] = -0.1
+                                st.session_state.pro_effects['contrast'] = 1.2
+                                st.session_state.pro_effects['saturation'] = 0.7
+                                st.rerun()
+                        with col_p2:
+                            if st.button("🌈 ビビッド"):
+                                st.session_state.pro_effects['brightness'] = 0.1
+                                st.session_state.pro_effects['contrast'] = 1.3
+                                st.session_state.pro_effects['saturation'] = 1.5
+                                st.rerun()
+                        with col_p3:
+                            if st.button("🌑 モノクロ"):
+                                st.session_state.pro_effects['saturation'] = 0.0
+                                st.rerun()
+                        
+                        if st.button("🔄 エフェクトをリセット"):
+                            st.session_state.pro_effects = {
+                                'speed': 1.0,
+                                'brightness': 0.0,
+                                'contrast': 1.0,
+                                'saturation': 1.0
+                            }
+                            st.rerun()
+                    
+                    st.markdown("---")
+                    
+                    # Phase 4: オーディオ
+                    st.subheader("🎵 Phase 4: オーディオ")
+                    
+                    with st.expander("🎵 BGMを追加", expanded=False):
+                        bgm_file = st.file_uploader("BGM音楽ファイル（MP3, WAV）", type=['mp3', 'wav'], key="new_bgm")
+                        
+                        if bgm_file:
+                            # BGMを保存
+                            bgm_path = TEMP_VIDEOS_DIR / f"bgm_{bgm_file.name}"
+                            with open(bgm_path, 'wb') as f:
+                                f.write(bgm_file.getbuffer())
+                            
+                            st.audio(bgm_path)
+                            st.session_state.pro_audio['bgm_path'] = str(bgm_path)
+                            st.success(f"✅ BGM: {bgm_file.name}")
+                        
+                        if st.session_state.pro_audio['bgm_path']:
+                            st.write("**音量バランス**")
+                            
+                            bgm_volume = st.slider(
+                                "BGM音量",
+                                0.0, 1.0,
+                                st.session_state.pro_audio['bgm_volume'],
+                                0.1,
+                                key="audio_bgm_volume"
+                            )
+                            st.session_state.pro_audio['bgm_volume'] = bgm_volume
+                            
+                            original_volume = st.slider(
+                                "元の音声音量",
+                                0.0, 1.0,
+                                st.session_state.pro_audio['original_volume'],
+                                0.1,
+                                key="audio_original_volume"
+                            )
+                            st.session_state.pro_audio['original_volume'] = original_volume
+                            
+                            if st.button("🗑️ BGMを削除"):
+                                st.session_state.pro_audio['bgm_path'] = None
+                                st.rerun()
+                    
+                    st.markdown("---")
+                    
+                    # Phase 5: アニメーション
+                    st.subheader("✨ Phase 5: アニメーション")
+                    
+                    with st.expander("✨ レイヤーにアニメーションを追加", expanded=False):
+                        if not st.session_state.pro_layers:
+                            st.info("まずテキストまたはステッカーレイヤーを追加してください")
+                        else:
+                            layer_options = [f"レイヤー {i+1}: {layer['type']}" for i, layer in enumerate(st.session_state.pro_layers)]
+                            selected_layer_idx = st.selectbox("アニメーションを追加するレイヤー", range(len(layer_options)), format_func=lambda i: layer_options[i], key="anim_layer_select")
+                            
+                            animation_type = st.selectbox(
+                                "アニメーションタイプ",
+                                ["none", "fade_in", "fade_out", "fade_in_out", "slide_in_left", "slide_in_right", "slide_in_top", "slide_in_bottom"],
+                                format_func=lambda x: {
+                                    "none": "なし",
+                                    "fade_in": "フェードイン",
+                                    "fade_out": "フェードアウト",
+                                    "fade_in_out": "フェードイン＆アウト",
+                                    "slide_in_left": "左からスライドイン",
+                                    "slide_in_right": "右からスライドイン",
+                                    "slide_in_top": "上からスライドイン",
+                                    "slide_in_bottom": "下からスライドイン"
+                                }[x],
+                                key="anim_type"
+                            )
+                            
+                            if st.button("✨ アニメーションを適用"):
+                                st.session_state.pro_layers[selected_layer_idx]['animation'] = animation_type
+                                st.success(f"✅ レイヤー{selected_layer_idx+1}にアニメーション「{animation_type}」を適用しました！")
+                                st.rerun()
+                    
+                    st.markdown("---")
+                    
+                    # プレビュー生成ボタン
+                    st.subheader("🎬 プレビュー")
+                    
+                    if st.button("🔄 プレビューを生成", type="primary", use_container_width=True):
+                        with st.spinner("🎬 プロフェッショナル編集を適用中... (数分かかる場合があります)"):
+                            output_path = str(TEMP_VIDEOS_DIR / "pro_preview.mp4")
+                            
+                            # プロフェッショナル編集を適用
+                            success = generate_professional_video(
+                                st.session_state.video_path,
+                                st.session_state.clip_start,
+                                st.session_state.clip_end,
+                                output_path,
+                                st.session_state.pro_layers,
+                                st.session_state.pro_effects,
+                                st.session_state.pro_audio
+                            )
+                            
+                            if success:
+                                st.session_state.pro_preview_path = output_path
+                                st.success("✅ プレビュー生成完了！")
+                                st.rerun()
+                
+                with col_preview:
+                    st.subheader("📺 プレビュー")
+                    
+                    # スティッキープレビュー用CSS
+                    st.markdown("""
+                        <style>
+                        div[data-testid="column"]:has(> div > .pro-preview) {
+                            position: sticky !important;
+                            top: 20px !important;
+                            align-self: flex-start !important;
+                        }
+                        </style>
+                    """, unsafe_allow_html=True)
+                    
+                    st.markdown('<div class="pro-preview">', unsafe_allow_html=True)
+                    
+                    if 'pro_preview_path' in st.session_state and st.session_state.pro_preview_path:
+                        st.video(st.session_state.pro_preview_path)
+                        
+                        # 最終動画生成
+                        st.markdown("---")
+                        st.subheader("💾 最終動画を生成")
+                        
+                        if st.button("🎬 最終動画を生成", type="primary", use_container_width=True):
+                            with st.spinner("🎬 最終動画を生成中..."):
+                                final_output_path = str(TEMP_VIDEOS_DIR / "pro_final_output.mp4")
+                                
+                                success = generate_professional_video(
+                                    st.session_state.video_path,
+                                    st.session_state.clip_start,
+                                    st.session_state.clip_end,
+                                    final_output_path,
+                                    st.session_state.pro_layers,
+                                    st.session_state.pro_effects,
+                                    st.session_state.pro_audio
+                                )
+                                
+                                if success:
+                                    st.success("✅ 最終動画生成完了！")
+                                    st.video(final_output_path)
+                                    
+                                    # ダウンロードボタン
+                                    with open(final_output_path, 'rb') as f:
+                                        st.download_button(
+                                            label="📥 動画をダウンロード",
+                                            data=f,
+                                            file_name="context_cut_pro_professional.mp4",
+                                            mime="video/mp4",
+                                            use_container_width=True
+                                        )
+                    else:
+                        st.info("💡 左側で編集を行い、「プレビューを生成」ボタンをクリックしてください")
+                        
+                        # 編集状況サマリー
+                        st.markdown("---")
+                        st.write("**📊 編集状況**")
+                        st.metric("テキストレイヤー", len([l for l in st.session_state.pro_layers if l['type'] == 'text']))
+                        st.metric("ステッカーレイヤー", len([l for l in st.session_state.pro_layers if l['type'] == 'sticker']))
+                        st.metric("BGM", "あり" if st.session_state.pro_audio['bgm_path'] else "なし")
+                        st.metric("エフェクト", "適用中" if st.session_state.pro_effects['speed'] != 1.0 or st.session_state.pro_effects['brightness'] != 0.0 else "なし")
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
     
     else:
         st.info("👈 サイドバーから動画を取得し、文字起こしを実行してください。")
