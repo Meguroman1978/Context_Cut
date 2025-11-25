@@ -1176,6 +1176,17 @@ def generate_professional_video(
             # BGMを読み込み
             bgm_stream = ffmpeg.input(bgm_path).audio
             
+            # BGMのタイミング設定を取得
+            bgm_start = audio_settings.get('bgm_start', 0.0)
+            bgm_end = audio_settings.get('bgm_end')
+            video_duration = end_time - start_time
+            
+            if bgm_end is None or bgm_end > video_duration:
+                bgm_end = video_duration
+            
+            # BGMの再生時間を計算
+            bgm_duration = bgm_end - bgm_start
+            
             # 音量調整
             original_volume = audio_settings.get('original_volume', 1.0)
             bgm_volume = audio_settings.get('bgm_volume', 0.5)
@@ -1183,9 +1194,15 @@ def generate_professional_video(
             audio_stream = audio_stream.filter('volume', original_volume)
             bgm_stream = bgm_stream.filter('volume', bgm_volume)
             
-            # BGMを動画の長さに合わせてループ
-            video_duration = end_time - start_time
-            bgm_stream = bgm_stream.filter('aloop', loop=-1, size=int(video_duration * 44100))
+            # BGMを指定された長さに合わせてループ
+            if bgm_duration > 0:
+                bgm_stream = bgm_stream.filter('aloop', loop=-1, size=int(bgm_duration * 44100))
+                
+                # BGMの再生タイミングを調整（adelayフィルターを使用）
+                if bgm_start > 0:
+                    # 開始時間分だけ遅延させる
+                    delay_ms = int(bgm_start * 1000)
+                    bgm_stream = bgm_stream.filter('adelay', f'{delay_ms}|{delay_ms}')
             
             # 2つの音声をミックス
             audio_stream = ffmpeg.filter([audio_stream, bgm_stream], 'amix', inputs=2, duration='first')
@@ -1872,7 +1889,9 @@ def main():
                     st.session_state.pro_audio = {
                         'bgm_path': None,
                         'bgm_volume': 0.5,
-                        'original_volume': 1.0
+                        'original_volume': 1.0,
+                        'bgm_start': 0.0,
+                        'bgm_end': None  # None means use full video duration
                     }
                 
                 # 2カラムレイアウト: 左側に編集ツール、右側にプレビュー
@@ -1905,21 +1924,17 @@ def main():
                         slider_min = max(0.0, float(clip_start) - slider_buffer)
                         slider_max = min(st.session_state.video_duration, float(clip_end) + slider_buffer)
                         
-                        # スライダーの値を一時的にセッションステートに保存
-                        if 'timeline_slider_values' not in st.session_state:
-                            st.session_state.timeline_slider_values = (float(clip_start), float(clip_end))
-                        
+                        # スライダーのデフォルト値は常に現在のclip_start/clip_endを使用
                         time_range = st.slider(
                             "開始・終了時間を調整（スライダー）",
                             min_value=slider_min,
                             max_value=slider_max,
-                            value=st.session_state.timeline_slider_values,
+                            value=(float(clip_start), float(clip_end)),
                             step=0.1,
                             key="pro_timeline_slider"
                         )
                         
                         slider_start, slider_end = time_range
-                        st.session_state.timeline_slider_values = (slider_start, slider_end)
                         
                         # スライダー調整後の値を表示
                         col_m1, col_m2, col_m3 = st.columns(3)
@@ -1953,34 +1968,44 @@ def main():
                                 key="pro_timeline_end"
                             )
                         
-                        # プレビュー生成ボタン
-                        col_b1, col_b2 = st.columns(2)
-                        with col_b1:
-                            if st.button("🔄 プレビューを更新", use_container_width=True):
-                                with st.spinner("プレビューを生成中..."):
-                                    preview_path = str(TEMP_VIDEOS_DIR / "timeline_preview.mp4")
-                                    if create_preview_clip(st.session_state.video_path, new_start, new_end, preview_path):
-                                        st.session_state.timeline_preview_path = preview_path
-                                        st.success("✅ プレビュー更新完了!")
-                                        st.rerun()
-                        
-                        with col_b2:
-                            if st.button("⏱️ タイムラインを適用", type="primary", use_container_width=True):
-                                st.session_state.clip_start = new_start
-                                st.session_state.clip_end = new_end
-                                st.session_state.timeline_slider_values = (new_start, new_end)
-                                st.success(f"✅ タイムラインを更新: {new_start:.1f}秒 〜 {new_end:.1f}秒")
-                                st.rerun()
-                        
-                        # プレビュー動画表示
-                        if 'timeline_preview_path' in st.session_state:
-                            st.markdown("---")
-                            st.write("**📺 プレビュー:**")
-                            st.video(st.session_state.timeline_preview_path)
+                        # タイムライン適用ボタン
+                        if st.button("⏱️ タイムラインを適用", type="primary", use_container_width=True):
+                            st.session_state.clip_start = new_start
+                            st.session_state.clip_end = new_end
+                            st.success(f"✅ タイムラインを更新: {new_start:.1f}秒 〜 {new_end:.1f}秒")
+                            st.rerun()
                     
                     st.markdown("---")
                     
                     # テキストレイヤー
+                    # 既存レイヤーの表示
+                    if st.session_state.pro_layers:
+                        st.write(f"**📚 レイヤー一覧** ({len(st.session_state.pro_layers)}個)")
+                        
+                        for i, layer in enumerate(st.session_state.pro_layers):
+                            with st.expander(f"{'📝' if layer['type'] == 'text' else '🖼️' if layer['type'] == 'sticker' else '🎵'} レイヤー {i+1}: {layer['type'].upper()}", expanded=False):
+                                col_l1, col_l2 = st.columns([3, 1])
+                                
+                                with col_l1:
+                                    if layer['type'] == 'text':
+                                        st.text_area("内容", layer['content'], height=60, key=f"layer_content_{i}", disabled=True)
+                                        st.write(f"⏱️ {layer['start']:.1f}秒 〜 {layer['end']:.1f}秒")
+                                        st.write(f"🎨 サイズ: {layer['font_size']}px, 色: {layer['color']}")
+                                    elif layer['type'] == 'sticker':
+                                        st.write(f"📁 ファイル: {Path(layer['path']).name}")
+                                        st.write(f"⏱️ {layer['start']:.1f}秒 〜 {layer['end']:.1f}秒")
+                                        st.write(f"📐 位置: X={layer['x']}, Y={layer['y']}")
+                                        if layer.get('scale', 1.0) != 1.0:
+                                            st.write(f"🔍 スケール: {layer['scale']*100:.0f}%")
+                                
+                                with col_l2:
+                                    if st.button("🗑️ 削除", key=f"delete_layer_{i}"):
+                                        st.session_state.pro_layers.pop(i)
+                                        st.success("削除しました")
+                                        st.rerun()
+                    
+                    st.markdown("---")
+
                     st.subheader("📝 テキストレイヤー")
                     
                     with st.expander("➕ 新しいテキストレイヤーを追加", expanded=False):
@@ -2074,33 +2099,6 @@ def main():
                             st.success(f"✅ テキストレイヤーを追加しました！")
                             st.rerun()
                     
-                    # 既存レイヤーの表示
-                    if st.session_state.pro_layers:
-                        st.write(f"**📚 レイヤー一覧** ({len(st.session_state.pro_layers)}個)")
-                        
-                        for i, layer in enumerate(st.session_state.pro_layers):
-                            with st.expander(f"{'📝' if layer['type'] == 'text' else '🖼️' if layer['type'] == 'sticker' else '🎵'} レイヤー {i+1}: {layer['type'].upper()}", expanded=False):
-                                col_l1, col_l2 = st.columns([3, 1])
-                                
-                                with col_l1:
-                                    if layer['type'] == 'text':
-                                        st.text_area("内容", layer['content'], height=60, key=f"layer_content_{i}", disabled=True)
-                                        st.write(f"⏱️ {layer['start']:.1f}秒 〜 {layer['end']:.1f}秒")
-                                        st.write(f"🎨 サイズ: {layer['font_size']}px, 色: {layer['color']}")
-                                    elif layer['type'] == 'sticker':
-                                        st.write(f"📁 ファイル: {Path(layer['path']).name}")
-                                        st.write(f"⏱️ {layer['start']:.1f}秒 〜 {layer['end']:.1f}秒")
-                                        st.write(f"📐 位置: X={layer['x']}, Y={layer['y']}")
-                                        if layer.get('scale', 1.0) != 1.0:
-                                            st.write(f"🔍 スケール: {layer['scale']*100:.0f}%")
-                                
-                                with col_l2:
-                                    if st.button("🗑️ 削除", key=f"delete_layer_{i}"):
-                                        st.session_state.pro_layers.pop(i)
-                                        st.success("削除しました")
-                                        st.rerun()
-                    
-                    st.markdown("---")
                     
                     # ステッカー・画像
                     st.subheader("🖼️ ステッカー・画像")
@@ -2328,7 +2326,49 @@ def main():
                             st.info("💡 BGMは自動的に動画の長さに合わせてループします")
                         
                         if st.session_state.pro_audio['bgm_path']:
-                            st.write("**音量バランス**")
+                            st.markdown("---")
+                            st.write("**⏱️ BGM挿入タイミング設定**")
+                            
+                            # BGMの開始・終了時間をスライダーで設定
+                            bgm_time_range = st.slider(
+                                "BGM再生範囲（秒）",
+                                min_value=0.0,
+                                max_value=clip_duration,
+                                value=(
+                                    st.session_state.pro_audio.get('bgm_start', 0.0),
+                                    st.session_state.pro_audio.get('bgm_end', clip_duration) or clip_duration
+                                ),
+                                step=0.1,
+                                key="bgm_time_slider",
+                                help="BGMを再生する時間範囲を指定します。動画の途中から開始したり、途中で終了させることができます。"
+                            )
+                            
+                            col_bgm1, col_bgm2 = st.columns(2)
+                            with col_bgm1:
+                                bgm_start = st.number_input(
+                                    "開始時間（秒）",
+                                    min_value=0.0,
+                                    max_value=clip_duration,
+                                    value=float(bgm_time_range[0]),
+                                    step=0.1,
+                                    key="bgm_start_input"
+                                )
+                            with col_bgm2:
+                                bgm_end = st.number_input(
+                                    "終了時間（秒）",
+                                    min_value=bgm_start,
+                                    max_value=clip_duration,
+                                    value=float(bgm_time_range[1]),
+                                    step=0.1,
+                                    key="bgm_end_input"
+                                )
+                            
+                            st.session_state.pro_audio['bgm_start'] = bgm_start
+                            st.session_state.pro_audio['bgm_end'] = bgm_end
+                            st.info(f"💡 BGMは {bgm_start:.1f}秒 から {bgm_end:.1f}秒 まで再生されます（長さ: {bgm_end - bgm_start:.1f}秒）")
+                            
+                            st.markdown("---")
+                            st.write("**🔊 音量バランス**")
                             
                             bgm_volume = st.slider(
                                 "BGM音量",
@@ -2348,6 +2388,7 @@ def main():
                             )
                             st.session_state.pro_audio['original_volume'] = original_volume
                             
+                            st.markdown("---")
                             if st.button("🗑️ BGMを削除"):
                                 st.session_state.pro_audio['bgm_path'] = None
                                 st.rerun()
