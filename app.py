@@ -1897,29 +1897,86 @@ def main():
                     with st.expander("🎯 タイムライン範囲の微調整", expanded=False):
                         st.write("動画の開始・終了時間を0.1秒単位で調整できます")
                         
-                        new_start = st.number_input(
-                            "開始時間（秒）",
-                            min_value=0.0,
-                            max_value=st.session_state.video_duration,
-                            value=float(clip_start),
+                        # スライダーでの調整（ラベル選択式）
+                        st.write("**🎬 スライダーで範囲を調整:**")
+                        
+                        # 調整範囲を計算（前後30秒）
+                        slider_buffer = 30.0
+                        slider_min = max(0.0, float(clip_start) - slider_buffer)
+                        slider_max = min(st.session_state.video_duration, float(clip_end) + slider_buffer)
+                        
+                        # スライダーの値を一時的にセッションステートに保存
+                        if 'timeline_slider_values' not in st.session_state:
+                            st.session_state.timeline_slider_values = (float(clip_start), float(clip_end))
+                        
+                        time_range = st.slider(
+                            "開始・終了時間を調整（スライダー）",
+                            min_value=slider_min,
+                            max_value=slider_max,
+                            value=st.session_state.timeline_slider_values,
                             step=0.1,
-                            key="pro_timeline_start"
+                            key="pro_timeline_slider"
                         )
                         
-                        new_end = st.number_input(
-                            "終了時間（秒）",
-                            min_value=new_start + 0.1,
-                            max_value=st.session_state.video_duration,
-                            value=float(clip_end),
-                            step=0.1,
-                            key="pro_timeline_end"
-                        )
+                        slider_start, slider_end = time_range
+                        st.session_state.timeline_slider_values = (slider_start, slider_end)
                         
-                        if st.button("⏱️ タイムラインを適用"):
-                            st.session_state.clip_start = new_start
-                            st.session_state.clip_end = new_end
-                            st.success(f"✅ タイムラインを更新: {new_start:.1f}秒 〜 {new_end:.1f}秒")
-                            st.rerun()
+                        # スライダー調整後の値を表示
+                        col_m1, col_m2, col_m3 = st.columns(3)
+                        with col_m1:
+                            st.metric("開始時間", f"{slider_start:.2f}秒")
+                        with col_m2:
+                            st.metric("終了時間", f"{slider_end:.2f}秒")
+                        with col_m3:
+                            st.metric("長さ", f"{slider_end - slider_start:.2f}秒")
+                        
+                        st.markdown("---")
+                        st.write("**🔢 数値入力で微調整:**")
+                        
+                        col_n1, col_n2 = st.columns(2)
+                        with col_n1:
+                            new_start = st.number_input(
+                                "開始時間（秒）",
+                                min_value=0.0,
+                                max_value=st.session_state.video_duration,
+                                value=float(slider_start),
+                                step=0.1,
+                                key="pro_timeline_start"
+                            )
+                        with col_n2:
+                            new_end = st.number_input(
+                                "終了時間（秒）",
+                                min_value=new_start + 0.1,
+                                max_value=st.session_state.video_duration,
+                                value=float(slider_end),
+                                step=0.1,
+                                key="pro_timeline_end"
+                            )
+                        
+                        # プレビュー生成ボタン
+                        col_b1, col_b2 = st.columns(2)
+                        with col_b1:
+                            if st.button("🔄 プレビューを更新", use_container_width=True):
+                                with st.spinner("プレビューを生成中..."):
+                                    preview_path = str(TEMP_VIDEOS_DIR / "timeline_preview.mp4")
+                                    if create_preview_clip(st.session_state.video_path, new_start, new_end, preview_path):
+                                        st.session_state.timeline_preview_path = preview_path
+                                        st.success("✅ プレビュー更新完了!")
+                                        st.rerun()
+                        
+                        with col_b2:
+                            if st.button("⏱️ タイムラインを適用", type="primary", use_container_width=True):
+                                st.session_state.clip_start = new_start
+                                st.session_state.clip_end = new_end
+                                st.session_state.timeline_slider_values = (new_start, new_end)
+                                st.success(f"✅ タイムラインを更新: {new_start:.1f}秒 〜 {new_end:.1f}秒")
+                                st.rerun()
+                        
+                        # プレビュー動画表示
+                        if 'timeline_preview_path' in st.session_state:
+                            st.markdown("---")
+                            st.write("**📺 プレビュー:**")
+                            st.video(st.session_state.timeline_preview_path)
                     
                     st.markdown("---")
                     
@@ -2059,11 +2116,27 @@ def main():
                             
                             st.image(sticker_path, caption="アップロードした画像", width=200)
                             
+                            st.write("**⏱️ 表示時間設定**")
+                            
+                            # スライダーでの時間調整
+                            if 'sticker_time_slider' not in st.session_state:
+                                st.session_state.sticker_time_slider = (0.0, min(3.0, clip_duration))
+                            
+                            sticker_time_range = st.slider(
+                                "表示時間範囲（秒）",
+                                min_value=0.0,
+                                max_value=clip_duration,
+                                value=st.session_state.sticker_time_slider,
+                                step=0.1,
+                                key="sticker_time_slider_widget"
+                            )
+                            st.session_state.sticker_time_slider = sticker_time_range
+                            
                             col_s1, col_s2 = st.columns(2)
                             with col_s1:
-                                sticker_start = st.number_input("開始時間（秒）", 0.0, clip_duration, 0.0, 0.1, key="new_sticker_start")
+                                sticker_start = st.number_input("開始時間（秒）", 0.0, clip_duration, float(sticker_time_range[0]), 0.1, key="new_sticker_start")
                             with col_s2:
-                                sticker_end = st.number_input("終了時間（秒）", sticker_start, clip_duration, min(sticker_start + 3.0, clip_duration), 0.1, key="new_sticker_end")
+                                sticker_end = st.number_input("終了時間（秒）", sticker_start, clip_duration, float(sticker_time_range[1]), 0.1, key="new_sticker_end")
                             
                             # 位置調整
                             st.write("**📍 位置設定**")
@@ -2248,9 +2321,11 @@ def main():
                             with open(bgm_path, 'wb') as f:
                                 f.write(bgm_file.getbuffer())
                             
+                            st.write("**🎵 BGMプレビュー:**")
                             st.audio(bgm_path)
                             st.session_state.pro_audio['bgm_path'] = str(bgm_path)
                             st.success(f"✅ BGM: {bgm_file.name}")
+                            st.info("💡 BGMは自動的に動画の長さに合わせてループします")
                         
                         if st.session_state.pro_audio['bgm_path']:
                             st.write("**音量バランス**")
