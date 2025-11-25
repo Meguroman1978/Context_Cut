@@ -36,9 +36,10 @@ except ImportError as e:
 FONTS_DIR = Path("./fonts")
 TEMP_VIDEOS_DIR = Path("./temp_videos")
 CHROMADB_DIR = Path("./chromadb_data")
+TEXT_BACKGROUNDS_DIR = Path("./text_backgrounds")  # テキストレイヤー背景画像用
 
 # ディレクトリの作成
-for dir_path in [FONTS_DIR, TEMP_VIDEOS_DIR, CHROMADB_DIR]:
+for dir_path in [FONTS_DIR, TEMP_VIDEOS_DIR, CHROMADB_DIR, TEXT_BACKGROUNDS_DIR]:
     dir_path.mkdir(exist_ok=True, parents=True)
 
 # 日本語フォントライブラリ（Google Fonts - 商用利用可能）
@@ -1060,6 +1061,34 @@ def generate_professional_video(
         # テキストレイヤー
         text_layers = [l for l in layers if l['type'] == 'text']
         for text_layer in text_layers:
+            # 背景画像がある場合、先に背景を配置
+            bg_image_path = text_layer.get('background_image')
+            if bg_image_path and Path(bg_image_path).exists():
+                bg_stream = ffmpeg.input(str(Path(bg_image_path).absolute()).replace("\\", "/"), loop=1, t=end_time - start_time)
+                
+                # 背景画像のスケール調整
+                bg_scale = text_layer.get('background_scale', 1.0)
+                if bg_scale != 1.0:
+                    bg_stream = bg_stream.filter('scale', f'iw*{bg_scale}', f'ih*{bg_scale}')
+                
+                # 背景の透明度調整
+                bg_opacity = text_layer.get('background_opacity', 1.0)
+                if bg_opacity < 1.0:
+                    bg_stream = bg_stream.filter('format', 'yuva420p').filter('colorchannelmixer', aa=bg_opacity)
+                
+                # 背景画像を配置（テキストと同じ位置に）
+                bg_x = text_layer['x']
+                bg_y = text_layer['y']
+                bg_enable_expr = f"between(t,{text_layer['start']},{text_layer['end']})"
+                
+                video_stream = video_stream.overlay(
+                    bg_stream,
+                    x=bg_x,
+                    y=bg_y,
+                    enable=bg_enable_expr,
+                    format='auto'
+                )
+            
             # フォントパス（レイヤーに指定されたフォントを使用）
             font_file = text_layer.get('font_file', 'Noto_Sans_JP.ttf')
             font_path = str(FONTS_DIR / font_file).replace("\\", "/")
@@ -1946,6 +1975,12 @@ def main():
                                     if layer['type'] == 'text':
                                         st.text_area("内容", layer['content'], height=60, key=f"layer_content_{i}", disabled=True)
                                         st.write(f"🎨 サイズ: {layer['font_size']}px, 色: {layer['color']}")
+                                        # 背景画像情報を表示
+                                        if layer.get('background_image'):
+                                            bg_name = Path(layer['background_image']).stem
+                                            st.write(f"🖼️ 背景: {bg_name} (透明度: {layer.get('background_opacity', 1.0)*100:.0f}%)")
+                                        else:
+                                            st.write("🖼️ 背景: なし")
                                     elif layer['type'] == 'sticker':
                                         st.write(f"📁 ファイル: {Path(layer['path']).name}")
                                         st.write(f"📐 位置: X={layer['x']}, Y={layer['y']}")
@@ -2065,6 +2100,74 @@ def main():
                         with col_t4:
                             text_color = st.color_picker("文字色", "#FFFFFF", key="new_text_color")
                         
+                        st.markdown("---")
+                        
+                        # 背景画像設定
+                        st.write("**🖼️ 背景画像設定**")
+                        background_mode = st.radio(
+                            "背景設定",
+                            ["⛔ 設定しない", "📚 プリセットから選択", "📤 カスタム画像をアップロード"],
+                            key="text_bg_mode",
+                            horizontal=True
+                        )
+                        
+                        text_bg_path = None
+                        text_bg_scale = 1.0
+                        text_bg_opacity = 1.0
+                        
+                        if background_mode == "📚 プリセットから選択":
+                            # プリセット背景画像を取得
+                            preset_backgrounds = list(TEXT_BACKGROUNDS_DIR.glob("*.png")) + list(TEXT_BACKGROUNDS_DIR.glob("*.jpg"))
+                            if preset_backgrounds:
+                                bg_names = [bg.stem for bg in preset_backgrounds]
+                                selected_bg_name = st.selectbox(
+                                    "背景画像を選択",
+                                    bg_names,
+                                    key="text_preset_bg"
+                                )
+                                text_bg_path = str(TEXT_BACKGROUNDS_DIR / f"{selected_bg_name}{[bg for bg in preset_backgrounds if bg.stem == selected_bg_name][0].suffix}")
+                                
+                                # プレビュー表示
+                                if Path(text_bg_path).exists():
+                                    st.image(text_bg_path, caption=f"選択した背景: {selected_bg_name}", width=200)
+                            else:
+                                st.info("💡 プリセット背景画像がまだありません。カスタム画像をアップロードしてください。")
+                                st.caption("※ 管理者は text_backgrounds/ フォルダに画像を配置することでプリセットを追加できます")
+                        
+                        elif background_mode == "📤 カスタム画像をアップロード":
+                            custom_bg_file = st.file_uploader(
+                                "背景画像（PNG, JPG推奨）",
+                                type=['png', 'jpg', 'jpeg'],
+                                key="text_custom_bg"
+                            )
+                            if custom_bg_file:
+                                # カスタム背景を保存
+                                custom_bg_path = TEMP_VIDEOS_DIR / f"text_bg_{len(st.session_state.pro_layers)}_{custom_bg_file.name}"
+                                with open(custom_bg_path, 'wb') as f:
+                                    f.write(custom_bg_file.getbuffer())
+                                text_bg_path = str(custom_bg_path)
+                                st.image(custom_bg_path, caption="アップロードした背景", width=200)
+                        
+                        # 背景画像が設定されている場合の調整オプション
+                        if text_bg_path:
+                            col_bg1, col_bg2 = st.columns(2)
+                            with col_bg1:
+                                text_bg_scale = st.slider(
+                                    "背景サイズ（%）",
+                                    50, 300, 100, 5,
+                                    key="text_bg_scale",
+                                    help="背景画像のサイズを調整"
+                                ) / 100.0
+                            with col_bg2:
+                                text_bg_opacity = st.slider(
+                                    "背景の透明度",
+                                    0.0, 1.0, 0.8, 0.1,
+                                    key="text_bg_opacity",
+                                    help="0.0=完全透明、1.0=完全不透明"
+                                )
+                        
+                        st.markdown("---")
+                        
                         # 位置調整（プリセット or 数値入力）
                         st.write("**📍 位置設定**")
                         position_mode = st.radio(
@@ -2103,7 +2206,7 @@ def main():
                             y = str(text_y_px)
                         
                         if st.button("➕ テキストレイヤーを追加", type="primary"):
-                            st.session_state.pro_layers.append({
+                            new_layer = {
                                 'type': 'text',
                                 'content': text_content,
                                 'start': text_start,
@@ -2113,8 +2216,12 @@ def main():
                                 'font_size': text_size,
                                 'color': text_color,
                                 'font_file': selected_font_file,
-                                'animation': 'none'
-                            })
+                                'animation': 'none',
+                                'background_image': text_bg_path,
+                                'background_scale': text_bg_scale,
+                                'background_opacity': text_bg_opacity
+                            }
+                            st.session_state.pro_layers.append(new_layer)
                             st.success(f"✅ テキストレイヤーを追加しました！")
                             st.rerun()
                     
