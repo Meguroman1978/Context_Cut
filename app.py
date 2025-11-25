@@ -43,21 +43,51 @@ for dir_path in [FONTS_DIR, TEMP_VIDEOS_DIR, CHROMADB_DIR]:
 
 # 日本語フォントライブラリ（Google Fonts - 商用利用可能）
 JAPANESE_FONTS = {
+    # ゴシック体（シンプル・読みやすい）
     "Noto Sans JP": "https://github.com/google/fonts/raw/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf",
-    "Noto Serif JP": "https://github.com/google/fonts/raw/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf",
-    "M PLUS 1p": "https://github.com/google/fonts/raw/main/ofl/mplus1p/MPLUS1p-Regular.ttf",
-    "M PLUS Rounded 1c": "https://github.com/google/fonts/raw/main/ofl/mplusrounded1c/MPLUSRounded1c-Regular.ttf",
-    "Zen Kaku Gothic New": "https://github.com/google/fonts/raw/main/ofl/zenkakugothicnew/ZenKakuGothicNew-Regular.ttf",
-    "Zen Maru Gothic": "https://github.com/google/fonts/raw/main/ofl/zenmarugothic/ZenMaruGothic-Regular.ttf",
-    "Kosugi Maru": "https://github.com/google/fonts/raw/main/apache/kosugimaru/KosugiMaru-Regular.ttf",
     "Kosugi": "https://github.com/google/fonts/raw/main/apache/kosugi/Kosugi-Regular.ttf",
     "Sawarabi Gothic": "https://github.com/google/fonts/raw/main/ofl/sawarabigothic/SawarabiGothic-Regular.ttf",
+    "Zen Kaku Gothic New": "https://github.com/google/fonts/raw/main/ofl/zenkakugothicnew/ZenKakuGothicNew-Regular.ttf",
+    "Mochiy Pop One": "https://github.com/google/fonts/raw/main/ofl/mochiypopone/MochiyPopOne-Regular.ttf",
+    "Murecho": "https://github.com/google/fonts/raw/main/ofl/murecho/Murecho%5Bwght%5D.ttf",
+    
+    # 丸ゴシック（柔らか・親しみやすい）
+    "M PLUS 1p": "https://github.com/google/fonts/raw/main/ofl/mplus1p/MPLUS1p-Regular.ttf",
+    "M PLUS Rounded 1c": "https://github.com/google/fonts/raw/main/ofl/mplusrounded1c/MPLUSRounded1c-Regular.ttf",
+    "Zen Maru Gothic": "https://github.com/google/fonts/raw/main/ofl/zenmarugothic/ZenMaruGothic-Regular.ttf",
+    "Kosugi Maru": "https://github.com/google/fonts/raw/main/apache/kosugimaru/KosugiMaru-Regular.ttf",
+    "Dela Gothic One": "https://github.com/google/fonts/raw/main/ofl/delagothicone/DelaGothicOne-Regular.ttf",
+    "Stick": "https://github.com/google/fonts/raw/main/apache/stick/Stick-Regular.ttf",
+    
+    # 明朝体（上品・フォーマル）
+    "Noto Serif JP": "https://github.com/google/fonts/raw/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf",
     "Sawarabi Mincho": "https://github.com/google/fonts/raw/main/ofl/sawarabimincho/SawarabiMincho-Regular.ttf",
+    "Shippori Mincho": "https://github.com/google/fonts/raw/main/ofl/shipporimincho/ShipporiMincho-Regular.ttf",
+    "Zen Antique": "https://github.com/google/fonts/raw/main/ofl/zenantique/ZenAntique-Regular.ttf",
+    
+    # 手書き風（温かみ・カジュアル）
     "Hachi Maru Pop": "https://github.com/google/fonts/raw/main/ofl/hachimarupop/HachiMaruPop-Regular.ttf",
     "Yusei Magic": "https://github.com/google/fonts/raw/main/ofl/yuseimagic/YuseiMagic-Regular.ttf",
+    "Klee One": "https://github.com/google/fonts/raw/main/ofl/kleeone/KleeOne-Regular.ttf",
+    "Kaisei Decol": "https://github.com/google/fonts/raw/main/ofl/kaiseidecol/KaiseiDecol-Regular.ttf",
+    "Yomogi": "https://github.com/google/fonts/raw/main/ofl/yomogi/Yomogi-Regular.ttf",
+    "Darumadrop One": "https://github.com/google/fonts/raw/main/ofl/darumadropone/DarumadropOne-Regular.ttf",
+    "Potta One": "https://github.com/google/fonts/raw/main/ofl/pottaone/PottaOne-Regular.ttf",
+    
+    # 装飾・ポップ（インパクト・個性的）
     "Reggae One": "https://github.com/google/fonts/raw/main/ofl/reggaeone/ReggaeOne-Regular.ttf",
     "Rampart One": "https://github.com/google/fonts/raw/main/ofl/rampartone/RampartOne-Regular.ttf",
-    "Klee One": "https://github.com/google/fonts/raw/main/ofl/kleeone/KleeOne-Regular.ttf"
+    "RocknRoll One": "https://github.com/google/fonts/raw/main/ofl/rocknrollone/RocknRollOne-Regular.ttf",
+    "Kaisei Opti": "https://github.com/google/fonts/raw/main/ofl/kaiseiopti/KaiseiOpti-Regular.ttf",
+    "New Tegomin": "https://github.com/google/fonts/raw/main/ofl/newtegomin/NewTegomin-Regular.ttf",
+    "Train One": "https://github.com/google/fonts/raw/main/ofl/trainone/TrainOne-Regular.ttf",
+    "DotGothic16": "https://github.com/google/fonts/raw/main/ofl/dotgothic16/DotGothic16-Regular.ttf",
+    
+    # モダン・スタイリッシュ
+    "Shippori Antique": "https://github.com/google/fonts/raw/main/ofl/shipporiantique/ShipporiAntique-Regular.ttf",
+    "Zen Old Mincho": "https://github.com/google/fonts/raw/main/ofl/zenoldmincho/ZenOldMincho-Regular.ttf",
+    "Kaisei Tokumin": "https://github.com/google/fonts/raw/main/ofl/kaiseitokumin/KaiseiTokumin-Regular.ttf",
+    "Shizuru": "https://github.com/google/fonts/raw/main/ofl/shizuru/Shizuru-Regular.ttf"
 }
 
 def download_japanese_fonts():
@@ -967,7 +997,7 @@ def generate_professional_video(
         video_stream = input_stream.video
         audio_stream = input_stream.audio
         
-        # Phase 3: エフェクト適用
+        # エフェクト
         speed = effects.get('speed', 1.0)
         brightness = effects.get('brightness', 0.0)
         contrast = effects.get('contrast', 1.0)
@@ -983,7 +1013,7 @@ def generate_professional_video(
         if brightness != 0.0 or contrast != 1.0 or saturation != 1.0:
             video_stream = video_stream.filter('eq', brightness=brightness, contrast=contrast, saturation=saturation)
         
-        # Phase 2: ステッカー・画像オーバーレイ
+        # ステッカー・画像
         sticker_layers = [l for l in layers if l['type'] == 'sticker']
         for sticker in sticker_layers:
             sticker_path = str(Path(sticker['path']).absolute()).replace("\\", "/")
@@ -1000,7 +1030,7 @@ def generate_professional_video(
             overlay_y = sticker['y']
             enable_expr = f"between(t,{sticker['start']},{sticker['end']})"
             
-            # Phase 5: アニメーション
+            # アニメーション
             if animation == 'fade_in':
                 sticker_stream = sticker_stream.filter('fade', type='in', start_time=0, duration=0.5)
             elif animation == 'fade_out':
@@ -1027,7 +1057,40 @@ def generate_professional_video(
                 format='auto'
             )
         
-        # Phase 1: テキストレイヤー
+            # アニメーション適用
+            animation = sticker.get('animation', 'none')
+            overlay_x = sticker['x']
+            overlay_y = sticker['y']
+            enable_expr = f"between(t,{sticker['start']},{sticker['end']})"
+            
+            # アニメーション
+            if animation == 'fade_in':
+                sticker_stream = sticker_stream.filter('fade', type='in', start_time=0, duration=0.5)
+            elif animation == 'fade_out':
+                duration = sticker['end'] - sticker['start']
+                sticker_stream = sticker_stream.filter('fade', type='out', start_time=max(0, duration - 0.5), duration=0.5)
+            elif animation == 'fade_in_out':
+                duration = sticker['end'] - sticker['start']
+                sticker_stream = sticker_stream.filter('fade', type='in', start_time=0, duration=0.5)
+                sticker_stream = sticker_stream.filter('fade', type='out', start_time=max(0, duration - 0.5), duration=0.5)
+            elif animation == 'slide_in_left':
+                overlay_x = f"if(lt(t-{sticker['start']},0.5),-w+(t-{sticker['start']})*w/0.5,{overlay_x})"
+            elif animation == 'slide_in_right':
+                overlay_x = f"if(lt(t-{sticker['start']},0.5),main_w-(t-{sticker['start']})*w/0.5,{overlay_x})"
+            elif animation == 'slide_in_top':
+                overlay_y = f"if(lt(t-{sticker['start']},0.5),-h+(t-{sticker['start']})*h/0.5,{overlay_y})"
+            elif animation == 'slide_in_bottom':
+                overlay_y = f"if(lt(t-{sticker['start']},0.5),main_h-(t-{sticker['start']})*h/0.5,{overlay_y})"
+            
+            video_stream = video_stream.overlay(
+                sticker_stream,
+                x=overlay_x,
+                y=overlay_y,
+                enable=enable_expr,
+                format='auto'
+            )
+        
+        # テキストレイヤー
         text_layers = [l for l in layers if l['type'] == 'text']
         for text_layer in text_layers:
             # フォントパス（レイヤーに指定されたフォントを使用）
@@ -1046,7 +1109,7 @@ def generate_professional_video(
             text_y = text_layer['y']
             text_alpha = '1.0'
             
-            # Phase 5: テキストアニメーション
+            # テキストアニメーション
             if animation == 'fade_in':
                 # フェードイン: 最初の0.5秒で透明度を0→1
                 text_alpha = f"if(lt(t-{text_layer['start']},0.5),(t-{text_layer['start']})/0.5,1)"
@@ -1080,7 +1143,34 @@ def generate_professional_video(
                 enable=enable_expr
             )
         
-        # Phase 4: オーディオミキシング
+        # エフェクト
+        speed = effects.get('speed', 1.0)
+        brightness = effects.get('brightness', 0.0)
+        contrast = effects.get('contrast', 1.0)
+        saturation = effects.get('saturation', 1.0)
+        
+        # 速度調整
+        if speed != 1.0:
+            video_stream = video_stream.filter('setpts', f'{1/speed}*PTS')
+            if speed <= 2.0:  # 2倍速以下の場合のみ音声も調整
+                audio_stream = audio_stream.filter('atempo', speed)
+        
+        # カラーフィルター
+        if brightness != 0.0 or contrast != 1.0 or saturation != 1.0:
+            video_stream = video_stream.filter('eq', brightness=brightness, contrast=contrast, saturation=saturation)
+        
+        # ステッカー・画像
+        sticker_layers = [l for l in layers if l['type'] == 'sticker']
+        for sticker in sticker_layers:
+            sticker_path = str(Path(sticker['path']).absolute()).replace("\\", "/")
+            sticker_stream = ffmpeg.input(sticker_path, loop=1, t=end_time - start_time)
+            
+            # スケール調整
+            scale = sticker.get('scale', 1.0)
+            if scale != 1.0:
+                sticker_stream = sticker_stream.filter('scale', f'iw*{scale}', f'ih*{scale}')
+            
+        # オーディオ
         bgm_path = audio_settings.get('bgm_path')
         if bgm_path and Path(bgm_path).exists():
             # BGMを読み込み
@@ -1626,7 +1716,7 @@ def main():
     if st.session_state.video_path and st.session_state.transcription is not None:
         
         # タブUIの選択状態を管理
-        tab_names = ["🔍 シーン検索", "✂️ カット範囲指定", "💬 テロップ編集", "🎬 プロ編集"]
+        tab_names = ["🔍 シーン検索", "🎬 プロ編集"]
         
         # タブの選択を制御
         if 'force_tab_index' in st.session_state:
@@ -1635,7 +1725,7 @@ def main():
             st.session_state.active_tab = st.session_state.force_tab_index
             del st.session_state.force_tab_index
         
-        tab1, tab2, tab3, tab4 = st.tabs(tab_names)
+        tab1, tab2 = st.tabs(tab_names)
         
         # タブ1: シーン検索
         with tab1:
@@ -1743,831 +1833,31 @@ def main():
                                 if st.button(f"✂️ 選択", key=f"select_{i}", use_container_width=True):
                                     st.session_state.selected_start = scene['start']
                                     st.session_state.selected_end = scene['end']
+                                    st.session_state.clip_start = scene['start']  # プロ編集用
+                                    st.session_state.clip_end = scene['end']  # プロ編集用
                                     st.session_state.scene_selected = True
-                                    st.success(f"✅ シーンを選択しました！「カット範囲指定」タブを開いてください。")
-                                    # 選択後にスクロールしてタブが見えるようにする
+                                    st.success(f"✅ シーンを選択しました！「🎬 プロ編集」タブで編集できます。")
                                     st.rerun()
         
-        # タブ2: カット範囲指定
+        # タブ2: プロフェッショナル編集
         with tab2:
-            st.header("✂️ カット範囲の指定")
-            
-            # シーン選択時のメッセージ表示
-            if st.session_state.get('scene_selected', False):
-                st.success(f"✅ シーンを選択しました！開始: {st.session_state.selected_start:.2f}秒、終了: {st.session_state.selected_end:.2f}秒")
-                st.info("💡 スライダーに選択した時間が自動入力されています。必要に応じて調整してください。")
-                # メッセージを一度だけ表示
-                st.session_state.scene_selected = False
-            
-            # セッション状態から初期値を取得
-            initial_start = float(st.session_state.selected_start)
-            initial_end = float(st.session_state.selected_end)
-            
-            # 動画の長さを超えないように調整
-            if initial_end > st.session_state.video_duration:
-                initial_end = st.session_state.video_duration
-            if initial_end <= initial_start:
-                initial_end = min(initial_start + 5.0, st.session_state.video_duration)
-            
-            # スライダーでの範囲指定（詳細設定は削除）
-            st.subheader("🎯 スライダーで範囲を指定")
-            
-            # 現在の選択範囲を大きく表示
-            st.markdown(f"""
-                <div style="background-color: #e8f4f8; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <h3 style="margin: 0; color: #0066cc;">📍 現在の選択範囲</h3>
-                    <p style="font-size: 24px; margin: 10px 0 0 0; color: #333;">
-                        <strong>{initial_start:.2f}秒</strong> 〜 <strong>{initial_end:.2f}秒</strong> 
-                        （長さ: <strong>{initial_end - initial_start:.2f}秒</strong>）
-                    </p>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            # スライダーの範囲を選択範囲の前後30秒に限定（より直感的に）
-            # エラー回避のため、範囲を安全に計算
-            try:
-                slider_buffer = 30.0
-                slider_min = max(0.0, initial_start - slider_buffer)
-                slider_max = min(st.session_state.video_duration, initial_end + slider_buffer)
-                
-                # slider_maxがslider_minより小さい場合の対処
-                if slider_max <= slider_min:
-                    slider_max = slider_min + 10.0
-                
-                # initial_startとinitial_endがslider範囲外の場合の対処
-                if initial_start < slider_min:
-                    slider_min = initial_start
-                if initial_end > slider_max:
-                    slider_max = initial_end
-                
-                # スライダーの上にラベルを追加
-                st.markdown(f"""
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; color: #666;">
-                        <span>🔻 範囲: <strong>{slider_min:.2f}秒</strong></span>
-                        <span>🔺 範囲: <strong>{slider_max:.2f}秒</strong></span>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                # スライダーのデフォルト値を設定
-                time_range = st.slider(
-                    "開始・終了時間を調整（スライダーを動かして微調整）",
-                    min_value=slider_min,
-                    max_value=slider_max,
-                    value=(initial_start, initial_end),
-                    step=0.1,
-                    key="cut_range_slider"
-                )
-                
-                start_time, end_time = time_range
-                
-                # スライダー調整後の値を表示
-                if (start_time != initial_start) or (end_time != initial_end):
-                    st.warning(f"⚠️ スライダーを調整しました: {start_time:.2f}秒 〜 {end_time:.2f}秒")
-            
-            except Exception as e:
-                st.error(f"スライダーの初期化エラー: {e}")
-                # フォールバック: 動画全体の範囲でスライダーを作成
-                time_range = st.slider(
-                    "開始・終了時間を調整",
-                    min_value=0.0,
-                    max_value=st.session_state.video_duration,
-                    value=(initial_start, initial_end),
-                    step=0.1,
-                    key="cut_range_slider_fallback"
-                )
-                start_time, end_time = time_range
-            
-            # 選択範囲を表示
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("開始時間", f"{start_time:.2f}秒")
-            with col2:
-                st.metric("終了時間", f"{end_time:.2f}秒")
-            with col3:
-                st.metric("範囲", f"{end_time - start_time:.2f}秒")
-            
-            # 選択範囲を更新（次回のリロード時に反映）
-            st.session_state.selected_start = start_time
-            st.session_state.selected_end = end_time
-            
-            # プレビュー生成
-            if st.button("プレビューを生成"):
-                preview_path = str(TEMP_VIDEOS_DIR / "preview.mp4")
-                st.info(f"📹 プレビュー生成中: {start_time:.2f}秒 〜 {end_time:.2f}秒")
-                if create_preview_clip(st.session_state.video_path, start_time, end_time, preview_path):
-                    st.success(f"✅ プレビュー生成完了! 範囲: {start_time:.2f}秒 〜 {end_time:.2f}秒")
-                    st.session_state.preview_path = preview_path
-                    st.session_state.clip_start = start_time
-                    st.session_state.clip_end = end_time
-                else:
-                    st.error(f"❌ プレビュー生成失敗: {start_time:.2f}秒 〜 {end_time:.2f}秒")
-            
-            # プレビュー動画を小さく表示
-            if 'preview_path' in st.session_state and st.session_state.preview_path:
-                st.subheader("📹 プレビュー")
-                
-                # CSSで動画サイズを小さくする
-                st.markdown(
-                    """
-                    <style>
-                    [data-testid="stVideo"] {
-                        max-width: 400px !important;
-                        margin: 0 auto;
-                    }
-                    [data-testid="stVideo"] video {
-                        max-width: 100% !important;
-                        height: auto !important;
-                    }
-                    </style>
-                    """,
-                    unsafe_allow_html=True
-                )
-                st.video(st.session_state.preview_path)
-        
-        # タブ3: テロップ編集
-        with tab3:
-            st.header("💬 テロップ編集")
-            
-            if 'clip_start' not in st.session_state:
-                st.warning("まず「カット範囲指定」タブでプレビューを生成してください。")
-            else:
-                # 2カラムレイアウト: 左側にプレビュー、右側に設定
-                col_preview, col_settings = st.columns([1, 1])
-                
-                with col_settings:
-                    # テキスト入力
-                    subtitle_text = st.text_area(
-                        "テロップテキスト",
-                        placeholder="ここにテロップを入力してください",
-                        height=100,
-                        key="subtitle_text_input"
-                    )
-                    
-                    # スタイル設定
-                    st.subheader("📐 スタイル設定")
-                    
-                    # フォント選択
-                    available_fonts = get_available_fonts()
-                    
-                    if not available_fonts:
-                        st.error("利用可能なフォントがありません。")
-                        selected_font = None
-                    else:
-                        selected_font = st.selectbox(
-                            "フォント選択",
-                            available_fonts,
-                            index=0,
-                            key="font_select"
-                        )
-                    
-                    # フォントサイズ
-                    font_size = st.slider("フォントサイズ", 24, 120, 48, key="font_size_slider")
-                    
-                    # テキストスケール調整（追加の拡大縮小機能）
-                    text_scale = st.slider(
-                        "📏 テキストスケール（%）",
-                        min_value=50,
-                        max_value=200,
-                        value=100,
-                        step=5,
-                        key="text_scale_slider",
-                        help="フォントサイズをさらに拡大・縮小します（100%=デフォルト）"
-                    )
-                    st.session_state.text_scale = text_scale / 100.0
-                    
-                    # 文字色
-                    font_color = st.color_picker("文字色", "#FFFFFF", key="font_color_picker")
-                    
-                    st.markdown("---")
-                    
-                    # テキスト表示位置設定（背景デザインの前に移動）
-                    st.subheader("📍 テキスト表示位置設定")
-                    position_mode = st.radio(
-                        "位置設定モード",
-                        ["プリセット", "テキスト表示位置選択", "カスタム（詳細）"],
-                        key="position_mode",
-                        horizontal=True
-                    )
-                    
-                    if position_mode == "プリセット":
-                        position_preset = st.selectbox(
-                            "テロップ位置",
-                            ["下部中央", "上部中央", "中央", "左下", "右下", "左上", "右上"],
-                            key="position_select"
-                        )
-                        
-                        position_map = {
-                            "下部中央": ("(w-text_w)/2", "h-text_h-20"),
-                            "上部中央": ("(w-text_w)/2", "20"),
-                            "中央": ("(w-text_w)/2", "(h-text_h)/2"),
-                            "左下": ("20", "h-text_h-20"),
-                            "右下": ("w-text_w-20", "h-text_h-20"),
-                            "左上": ("20", "20"),
-                            "右上": ("w-text_w-20", "20")
-                        }
-                        x_pos, y_pos = position_map[position_preset]
-                    
-                    elif position_mode == "テキスト表示位置選択":
-                        st.write("**テキスト表示位置を選択**")
-                        st.info("📍 ボタンをクリックしてテキストの表示位置を選択してください。")
-                        
-                        # ボタンで位置を選択
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            if st.button("↖️ 左上", key="pos_tl", use_container_width=True):
-                                st.session_state.visual_position = "左上"
-                                st.rerun()
-                            if st.button("⬅️ 左中", key="pos_ml", use_container_width=True):
-                                st.session_state.visual_position = "左中"
-                                st.rerun()
-                            if st.button("↙️ 左下", key="pos_bl", use_container_width=True):
-                                st.session_state.visual_position = "左下"
-                                st.rerun()
-                        
-                        with col2:
-                            if st.button("⬆️ 上中", key="pos_tc", use_container_width=True):
-                                st.session_state.visual_position = "上中"
-                                st.rerun()
-                            if st.button("⏺️ 中央", key="pos_cc", use_container_width=True):
-                                st.session_state.visual_position = "中央"
-                                st.rerun()
-                            if st.button("⬇️ 下中", key="pos_bc", use_container_width=True):
-                                st.session_state.visual_position = "下中"
-                                st.rerun()
-                        
-                        with col3:
-                            if st.button("↗️ 右上", key="pos_tr", use_container_width=True):
-                                st.session_state.visual_position = "右上"
-                                st.rerun()
-                            if st.button("➡️ 右中", key="pos_mr", use_container_width=True):
-                                st.session_state.visual_position = "右中"
-                                st.rerun()
-                            if st.button("↘️ 右下", key="pos_br", use_container_width=True):
-                                st.session_state.visual_position = "右下"
-                                st.rerun()
-                        
-                        # 選択された位置を表示
-                        selected_pos = st.session_state.get('visual_position', '下中')
-                        st.success(f"✅ 選択中: **{selected_pos}**")
-                        
-                        # 位置マッピング（9分割）
-                        visual_position_map = {
-                            "左上": ("20", "20"),
-                            "上中": ("(w-text_w)/2", "20"),
-                            "右上": ("w-text_w-20", "20"),
-                            "左中": ("20", "(h-text_h)/2"),
-                            "中央": ("(w-text_w)/2", "(h-text_h)/2"),
-                            "右中": ("w-text_w-20", "(h-text_h)/2"),
-                            "左下": ("20", "h-text_h-20"),
-                            "下中": ("(w-text_w)/2", "h-text_h-20"),
-                            "右下": ("w-text_w-20", "h-text_h-20")
-                        }
-                        x_pos, y_pos = visual_position_map[selected_pos]
-                    
-                    else:
-                        # カスタム位置設定
-                        st.write("**カスタム位置設定**")
-                        st.info("💡 座標は動画サイズに対する相対値です。(w=動画幅, h=動画高さ, text_w=テキスト幅, text_h=テキスト高さ)")
-                        
-                        col_x, col_y = st.columns(2)
-                        
-                        with col_x:
-                            x_pos_type = st.selectbox(
-                                "X位置の基準",
-                                ["左端からの距離", "中央揃え", "右端からの距離", "カスタム式"],
-                                key="x_pos_type"
-                            )
-                            
-                            if x_pos_type == "左端からの距離":
-                                x_offset = st.number_input("左端からのピクセル数", 0, 1000, 20, key="x_offset")
-                                x_pos = str(x_offset)
-                            elif x_pos_type == "中央揃え":
-                                x_pos = "(w-text_w)/2"
-                            elif x_pos_type == "右端からの距離":
-                                x_offset = st.number_input("右端からのピクセル数", 0, 1000, 20, key="x_offset_right")
-                                x_pos = f"w-text_w-{x_offset}"
-                            else:
-                                x_pos = st.text_input(
-                                    "X位置の式",
-                                    "(w-text_w)/2",
-                                    key="x_pos_custom",
-                                    help="例: (w-text_w)/2 (中央), 50 (左から50px), w-text_w-50 (右から50px)"
-                                )
-                        
-                        with col_y:
-                            y_pos_type = st.selectbox(
-                                "Y位置の基準",
-                                ["上端からの距離", "中央揃え", "下端からの距離", "カスタム式"],
-                                key="y_pos_type"
-                            )
-                            
-                            if y_pos_type == "上端からの距離":
-                                y_offset = st.number_input("上端からのピクセル数", 0, 1000, 20, key="y_offset")
-                                y_pos = str(y_offset)
-                            elif y_pos_type == "中央揃え":
-                                y_pos = "(h-text_h)/2"
-                            elif y_pos_type == "下端からの距離":
-                                y_offset = st.number_input("下端からのピクセル数", 0, 1000, 20, key="y_offset_bottom")
-                                y_pos = f"h-text_h-{y_offset}"
-                            else:
-                                y_pos = st.text_input(
-                                    "Y位置の式",
-                                    "h-text_h-20",
-                                    key="y_pos_custom",
-                                    help="例: (h-text_h)/2 (中央), 50 (上から50px), h-text_h-50 (下から50px)"
-                                )
-                        
-                        st.write(f"**現在の座標式**: X=`{x_pos}`, Y=`{y_pos}`")
-                    
-                    st.markdown("---")
-                    
-                    # 背景デザイン（先に定義）
-                    background_category = st.radio(
-                        "背景カテゴリ",
-                        ["シンプル", "吹き出し風", "カスタム画像"],
-                        key="background_category",
-                        horizontal=True
-                    )
-                    
-                    if background_category == "シンプル":
-                        # 背景の有無を選択
-                        use_background = st.radio(
-                            "背景を使用",
-                            ["なし（透明）", "あり"],
-                            key="use_simple_background",
-                            horizontal=True
-                        )
-                        
-                        if use_background == "あり":
-                            # 色選択
-                            bg_color_choice = st.radio(
-                                "背景色",
-                                ["⚪ 白", "⚫ 黒", "🎨 カスタム"],
-                                key="simple_bg_color_choice",
-                                horizontal=True
-                            )
-                            
-                            if bg_color_choice == "🎨 カスタム":
-                                # カラーピッカー
-                                custom_bg_color = st.color_picker(
-                                    "背景色を選択",
-                                    "#FFFF00",
-                                    key="custom_simple_bg_color"
-                                )
-                                st.session_state.simple_bg_custom_color = custom_bg_color
-                            
-                            # 透明度選択
-                            bg_opacity = st.radio(
-                                "透明度",
-                                ["半透明", "不透明"],
-                                key="simple_bg_opacity",
-                                horizontal=True
-                            )
-                            
-                            # background_typeを構築
-                            if bg_color_choice == "⚪ 白":
-                                if bg_opacity == "半透明":
-                                    background_type = "白（半透明）"
-                                else:
-                                    background_type = "白（不透明）"
-                            elif bg_color_choice == "⚫ 黒":
-                                if bg_opacity == "半透明":
-                                    background_type = "黒（半透明）"
-                                else:
-                                    background_type = "黒（不透明）"
-                            else:  # カスタム
-                                if bg_opacity == "半透明":
-                                    background_type = f"カスタム（{custom_bg_color}）半透明"
-                                else:
-                                    background_type = f"カスタム（{custom_bg_color}）不透明"
-                        else:
-                            background_type = "なし（透明）"
-                    elif background_category == "吹き出し風":
-                        # 吹き出しの形状を選択
-                        balloon_shape = st.selectbox(
-                            "吹き出しの形状",
-                            [
-                                "💬 楕円吹き出し",
-                                "🗨️ 角丸長方形",
-                                "☁️ 雲形",
-                                "⭐ 放射線",
-                                "⬛ 角張り長方形",
-                                "💭 考え事",
-                                "💢 叫び",
-                                "💥 爆発",
-                                "💗 ハート"
-                            ],
-                            key="balloon_shape_select"
-                        )
-                        
-                        # 吹き出しの色を選択（白と黒のみ）
-                        balloon_color_choice = st.radio(
-                            "吹き出しの色",
-                            ["⚪ 白", "⚫ 黒"],
-                            key="balloon_color_choice",
-                            horizontal=True
-                        )
-                        
-                        # 色に応じてサフィックスを設定
-                        if balloon_color_choice == "⚪ 白":
-                            balloon_color_suffix = "（白）"
-                        else:  # ⚫ 黒
-                            balloon_color_suffix = "（黒）"
-                        
-                        # background_typeを構築
-                        background_type = balloon_shape + balloon_color_suffix
-                        
-                        # 吹き出し背景のサイズ調整機能を追加
-                        st.write("**🔧 吹き出しのサイズ調整**")
-                        balloon_scale = st.slider(
-                            "🎈 吹き出しサイズ（%）",
-                            min_value=30,
-                            max_value=200,
-                            value=100,
-                            step=5,
-                            key="balloon_scale_slider",
-                            help="吹き出し背景の大きさを調整します。マウスでスライダーをドラッグしてください。"
-                        )
-                        st.session_state.balloon_scale = balloon_scale / 100.0
-                        
-                        # プレビュー用のサイズ表示
-                        if balloon_scale != 100:
-                            if balloon_scale < 100:
-                                st.info(f"📉 元のサイズの{balloon_scale}%に縮小されます")
-                            else:
-                                st.info(f"📈 元のサイズの{balloon_scale}%に拡大されます")
-                        
-                        # 吹き出し背景の自動調整オプション
-                        st.write("**⚙️ 自動調整オプション**")
-                        auto_position = st.checkbox(
-                            "🎯 テキストの表示位置を吹き出しの中央に合わせる",
-                            value=False,
-                            key="auto_position_checkbox",
-                            help="有効にすると、テキストを吹き出しの中央に自動配置します（手動位置指定より優先されます）"
-                        )
-                        
-                        auto_size = st.checkbox(
-                            "📊 テキストサイズを背景のサイズに合わせて自動調整",
-                            value=False,
-                            key="auto_size_checkbox",
-                            help="吹き出し背景のサイズに応じてフォントサイズを自動調整します（吹き出し幅60-70%のサイズ）"
-                        )
-                    else:  # カスタム画像
-                        st.write("**📤 カスタム背景画像をアップロード**")
-                        custom_bg_file = st.file_uploader(
-                            "PNG画像をアップロード（透過PNG推奨）",
-                            type=['png', 'jpg', 'jpeg'],
-                            key="custom_bg_uploader"
-                        )
-                        
-                        if custom_bg_file:
-                            # アップロードされた画像を保存
-                            custom_bg_path = TEMP_VIDEOS_DIR / f"custom_bg_{custom_bg_file.name}"
-                            with open(custom_bg_path, 'wb') as f:
-                                f.write(custom_bg_file.getbuffer())
-                            st.session_state.custom_bg_path = str(custom_bg_path)
-                            st.success(f"✅ {custom_bg_file.name} をアップロードしました！")
-                            
-                            # プレビュー表示
-                            st.image(custom_bg_path, caption="アップロードした背景画像", width=200)
-                            
-                            # 背景画像のサイズ調整
-                            st.write("**🔧 背景画像のサイズ調整**")
-                            bg_scale = st.slider(
-                                "背景画像のスケール（%）",
-                                min_value=10,
-                                max_value=200,
-                                value=100,
-                                step=5,
-                                key="bg_scale_slider",
-                                help="背景画像のサイズを調整します"
-                            )
-                            st.session_state.bg_scale = bg_scale / 100.0
-                            
-                            # 背景画像の位置選択
-                            st.write("**📍 背景画像の位置選択**")
-                            bg_position_mode = st.radio(
-                                "位置設定",
-                                ["プリセット", "ビジュアル選択"],
-                                key="bg_position_mode",
-                                horizontal=True
-                            )
-                            
-                            if bg_position_mode == "プリセット":
-                                bg_position_preset = st.selectbox(
-                                    "背景位置",
-                                    ["下部中央", "上部中央", "中央", "左下", "右下", "左上", "右上"],
-                                    key="bg_position_select"
-                                )
-                                bg_position_map = {
-                                    "下部中央": ("(main_w-overlay_w)/2", "main_h-overlay_h-80"),
-                                    "上部中央": ("(main_w-overlay_w)/2", "20"),
-                                    "中央": ("(main_w-overlay_w)/2", "(main_h-overlay_h)/2"),
-                                    "左下": ("20", "main_h-overlay_h-20"),
-                                    "右下": ("main_w-overlay_w-20", "main_h-overlay_h-20"),
-                                    "左上": ("20", "20"),
-                                    "右上": ("main_w-overlay_w-20", "20")
-                                }
-                                bg_x_pos, bg_y_pos = bg_position_map[bg_position_preset]
-                            else:  # ビジュアル選択
-                                st.write("**背景画像の位置を選択:**")
-                                col1, col2, col3 = st.columns(3)
-                                with col1:
-                                    if st.button("↖️ 左上", key="bg_pos_tl", use_container_width=True):
-                                        st.session_state.bg_visual_position = "左上"
-                                        st.rerun()
-                                    if st.button("⬅️ 左中", key="bg_pos_ml", use_container_width=True):
-                                        st.session_state.bg_visual_position = "左中"
-                                        st.rerun()
-                                    if st.button("↙️ 左下", key="bg_pos_bl", use_container_width=True):
-                                        st.session_state.bg_visual_position = "左下"
-                                        st.rerun()
-                                with col2:
-                                    if st.button("⬆️ 上中", key="bg_pos_tc", use_container_width=True):
-                                        st.session_state.bg_visual_position = "上中"
-                                        st.rerun()
-                                    if st.button("⏺️ 中央", key="bg_pos_cc", use_container_width=True):
-                                        st.session_state.bg_visual_position = "中央"
-                                        st.rerun()
-                                    if st.button("⬇️ 下中", key="bg_pos_bc", use_container_width=True):
-                                        st.session_state.bg_visual_position = "下中"
-                                        st.rerun()
-                                with col3:
-                                    if st.button("↗️ 右上", key="bg_pos_tr", use_container_width=True):
-                                        st.session_state.bg_visual_position = "右上"
-                                        st.rerun()
-                                    if st.button("➡️ 右中", key="bg_pos_mr", use_container_width=True):
-                                        st.session_state.bg_visual_position = "右中"
-                                        st.rerun()
-                                    if st.button("↘️ 右下", key="bg_pos_br", use_container_width=True):
-                                        st.session_state.bg_visual_position = "右下"
-                                        st.rerun()
-                                
-                                selected_bg_pos = st.session_state.get('bg_visual_position', '下中')
-                                st.success(f"✅ 選択中: **{selected_bg_pos}**")
-                                
-                                bg_visual_position_map = {
-                                    "左上": ("20", "20"),
-                                    "上中": ("(main_w-overlay_w)/2", "20"),
-                                    "右上": ("main_w-overlay_w-20", "20"),
-                                    "左中": ("20", "(main_h-overlay_h)/2"),
-                                    "中央": ("(main_w-overlay_w)/2", "(main_h-overlay_h)/2"),
-                                    "右中": ("main_w-overlay_w-20", "(main_h-overlay_h)/2"),
-                                    "左下": ("20", "main_h-overlay_h-20"),
-                                    "下中": ("(main_w-overlay_w)/2", "main_h-overlay_h-80"),
-                                    "右下": ("main_w-overlay_w-20", "main_h-overlay_h-20")
-                                }
-                                bg_x_pos, bg_y_pos = bg_visual_position_map[selected_bg_pos]
-                            
-                            st.session_state.bg_x_pos = bg_x_pos
-                            st.session_state.bg_y_pos = bg_y_pos
-                            
-                            background_type = "custom"
-                        else:
-                            st.warning("背景画像をアップロードしてください")
-                            background_type = "なし（透明）"
-                    
-                    # シンプル背景とカスタム画像ではauto_positionを無効化
-                    if background_category != "吹き出し風":
-                        auto_position = False
-                        auto_size = False
-                    
-                    # 背景位置選択（吹き出しとカスタム背景の場合のみ表示）
-                    if background_category in ["吹き出し風", "カスタム画像"]:
-                        st.subheader("🎨 背景位置選択")
-                        bg_position_mode = st.radio(
-                            "背景位置設定モード",
-                            ["プリセット", "背景位置選択"],
-                            key="bg_position_mode_telop",
-                            horizontal=True
-                        )
-                        
-                        if bg_position_mode == "プリセット":
-                            bg_position_preset = st.selectbox(
-                                "背景位置",
-                                ["下部中央", "上部中央", "中央", "左上", "左中", "左下", "右上", "右中", "右下"],
-                                key="bg_position_preset_telop"
-                            )
-                            
-                            bg_position_map = {
-                                "下部中央": ("(main_w-overlay_w)/2", "main_h-overlay_h-80"),
-                                "上部中央": ("(main_w-overlay_w)/2", "20"),
-                                "中央": ("(main_w-overlay_w)/2", "(main_h-overlay_h)/2"),
-                                "左上": ("20", "20"),
-                                "左中": ("20", "(main_h-overlay_h)/2"),
-                                "左下": ("20", "main_h-overlay_h-20"),
-                                "右上": ("main_w-overlay_w-20", "20"),
-                                "右中": ("main_w-overlay_w-20", "(main_h-overlay_h)/2"),
-                                "右下": ("main_w-overlay_w-20", "main_h-overlay_h-20")
-                            }
-                            bg_x_pos, bg_y_pos = bg_position_map[bg_position_preset]
-                            # 位置名も保存（テキスト自動配置用）
-                            bg_position_name_map = {
-                                "下部中央": "下中",
-                                "上部中央": "上中",
-                                "中央": "中央",
-                                "左上": "左上",
-                                "左中": "左中",
-                                "左下": "左下",
-                                "右上": "右上",
-                                "右中": "右中",
-                                "右下": "右下"
-                            }
-                            st.session_state.telop_bg_position_name = bg_position_name_map.get(bg_position_preset, "下中")
-                        
-                        else:  # 背景位置選択
-                            st.write("**背景位置を選択**")
-                            st.info("📍 ボタンをクリックして背景の配置位置を選択してください。")
-                            
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                if st.button("↖️ 左上", key="bg_pos_tl_telop", use_container_width=True):
-                                    st.session_state.bg_visual_position_telop = "左上"
-                                    st.rerun()
-                                if st.button("⬅️ 左中", key="bg_pos_ml_telop", use_container_width=True):
-                                    st.session_state.bg_visual_position_telop = "左中"
-                                    st.rerun()
-                                if st.button("↙️ 左下", key="bg_pos_bl_telop", use_container_width=True):
-                                    st.session_state.bg_visual_position_telop = "左下"
-                                    st.rerun()
-                            
-                            with col2:
-                                if st.button("⬆️ 上中", key="bg_pos_tc_telop", use_container_width=True):
-                                    st.session_state.bg_visual_position_telop = "上中"
-                                    st.rerun()
-                                if st.button("⏺️ 中央", key="bg_pos_cc_telop", use_container_width=True):
-                                    st.session_state.bg_visual_position_telop = "中央"
-                                    st.rerun()
-                                if st.button("⬇️ 下中", key="bg_pos_bc_telop", use_container_width=True):
-                                    st.session_state.bg_visual_position_telop = "下中"
-                                    st.rerun()
-                            
-                            with col3:
-                                if st.button("↗️ 右上", key="bg_pos_tr_telop", use_container_width=True):
-                                    st.session_state.bg_visual_position_telop = "右上"
-                                    st.rerun()
-                                if st.button("➡️ 右中", key="bg_pos_mr_telop", use_container_width=True):
-                                    st.session_state.bg_visual_position_telop = "右中"
-                                    st.rerun()
-                                if st.button("↘️ 右下", key="bg_pos_br_telop", use_container_width=True):
-                                    st.session_state.bg_visual_position_telop = "右下"
-                                    st.rerun()
-                            
-                            selected_bg_pos = st.session_state.get('bg_visual_position_telop', '下中')
-                            st.success(f"✅ 選択中: **{selected_bg_pos}**")
-                            
-                            bg_visual_position_map = {
-                                "左上": ("20", "20"),
-                                "上中": ("(main_w-overlay_w)/2", "20"),
-                                "右上": ("main_w-overlay_w-20", "20"),
-                                "左中": ("20", "(main_h-overlay_h)/2"),
-                                "中央": ("(main_w-overlay_w)/2", "(main_h-overlay_h)/2"),
-                                "右中": ("main_w-overlay_w-20", "(main_h-overlay_h)/2"),
-                                "左下": ("20", "main_h-overlay_h-20"),
-                                "下中": ("(main_w-overlay_w)/2", "main_h-overlay_h-80"),
-                                "右下": ("main_w-overlay_w-20", "main_h-overlay_h-20")
-                            }
-                            bg_x_pos, bg_y_pos = bg_visual_position_map[selected_bg_pos]
-                        
-                        # セッションステートに保存
-                        st.session_state.telop_bg_x_pos = bg_x_pos
-                        st.session_state.telop_bg_y_pos = bg_y_pos
-                        # 位置名も保存（テキスト自動配置用）
-                        if bg_position_mode == "背景位置選択":
-                            st.session_state.telop_bg_position_name = selected_bg_pos
-                    
-                    # リアルタイムプレビュー生成ボタン
-                    if st.button("🔄 プレビューを更新", key="update_preview"):
-                        if subtitle_text and selected_font:
-                            with st.spinner("プレビューを生成中..."):
-                                preview_with_subtitle_path = str(TEMP_VIDEOS_DIR / "preview_with_subtitle.mp4")
-                                success = generate_final_video_with_subtitle(
-                                    st.session_state.video_path,
-                                    st.session_state.clip_start,
-                                    st.session_state.clip_end,
-                                    preview_with_subtitle_path,
-                                    subtitle_text,
-                                    selected_font,
-                                    font_size,
-                                    font_color,
-                                    background_type,
-                                    x_pos,
-                                    y_pos,
-                                    auto_position=auto_position,
-                                    auto_size=auto_size
-                                )
-                                if success:
-                                    st.session_state.preview_with_subtitle_path = preview_with_subtitle_path
-                                    st.success("✅ プレビュー更新完了！")
-                        else:
-                            st.warning("テロップテキストを入力してください。")
-                
-                with col_preview:
-                    # リアルタイムプレビュー表示（スクロール追従する浮遊プレビュー）
-                    st.subheader("🎬 プレビュー")
-                    
-                    # CSSで動画サイズを小さくし、スクロール追従を追加
-                    st.markdown(
-                        """
-                        <style>
-                        /* プレビュー動画のサイズ調整 */
-                        [data-testid="stVideo"] {
-                            max-width: 400px !important;
-                            margin: 0 auto;
-                        }
-                        [data-testid="stVideo"] video {
-                            max-width: 100% !important;
-                            height: auto !important;
-                        }
-                        
-                        /* プレビューカラムをスクロール追従させる（PIP風） */
-                        div[data-testid="column"]:has(> div > div > div > [data-testid="stVideo"]) {
-                            position: sticky !important;
-                            top: 20px !important;
-                            align-self: flex-start !important;
-                            z-index: 100 !important;
-                        }
-                        </style>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                    
-                    if 'preview_with_subtitle_path' in st.session_state:
-                        st.video(st.session_state.preview_with_subtitle_path)
-                        st.info("💡 左側の設定を変更したら「プレビューを更新」をクリックしてください")
-                    else:
-                        # 元のプレビュー動画を表示（テロップなし）
-                        if 'preview_path' in st.session_state:
-                            st.video(st.session_state.preview_path)
-                            st.info("💡 テロップを入力して「プレビューを更新」をクリックすると、テロップ付きプレビューが表示されます")
-                        else:
-                            st.info("💡 まず「カット範囲指定」タブでプレビューを生成してください")
-                
-                # フォントアップロード
-                st.subheader("➕ 新しいフォントを追加")
-                uploaded_font = st.file_uploader(
-                    "フォントファイル (.ttf, .otf)",
-                    type=['ttf', 'otf'],
-                    key="font_uploader"
-                )
-                
-                if uploaded_font:
-                    if st.button("フォントを追加"):
-                        if save_uploaded_font(uploaded_font):
-                            st.success(f"✅ フォント '{uploaded_font.name}' を追加しました!")
-                            st.rerun()
-                
-                # 動画生成
-                st.divider()
-                st.subheader("🎬 最終動画生成")
-                
-                if st.button("🎬 テロップ付き動画を生成", type="primary"):
-                    if not subtitle_text:
-                        st.warning("テロップテキストを入力してください。")
-                    elif not selected_font:
-                        st.warning("フォントを選択してください。")
-                    else:
-                        with st.spinner("動画を生成中... (数分かかる場合があります)"):
-                            output_path = str(TEMP_VIDEOS_DIR / "final_output.mp4")
-                            
-                            success = generate_final_video_with_subtitle(
-                                st.session_state.video_path,
-                                st.session_state.clip_start,
-                                st.session_state.clip_end,
-                                output_path,
-                                subtitle_text,
-                                selected_font,
-                                font_size,
-                                font_color,
-                                background_type,
-                                x_pos,
-                                y_pos,
-                                auto_position=auto_position,
-                                auto_size=auto_size
-                            )
-                            
-                            if success:
-                                st.success("✅ 動画生成完了!")
-                                st.video(output_path)
-                                
-                                # ダウンロードボタン
-                                with open(output_path, 'rb') as f:
-                                    st.download_button(
-                                        label="📥 動画をダウンロード",
-                                        data=f,
-                                        file_name="context_cut_pro_output.mp4",
-                                        mime="video/mp4"
-                                    )
-        
-        # タブ4: プロフェッショナル編集
-        with tab4:
             st.header("🎬 プロフェッショナル動画編集")
             st.info("💡 **全Phase統合版**: タイムライン、マルチレイヤー、ステッカー、エフェクト、BGM、アニメーション")
             
-            if 'clip_start' not in st.session_state:
-                st.warning("⚠️ まず「カット範囲指定」タブでプレビューを生成してください。")
-                st.info("プロフェッショナル編集を使用するには、動画の基本範囲を先に設定する必要があります。")
+            st.info("💡 **全Phase統合版**: タイムライン、マルチレイヤー、ステッカー、エフェクト、BGM、アニメーション")
+            
+            # シーン選択またはカット範囲指定から範囲を取得
+            has_clip_range = 'clip_start' in st.session_state and 'clip_end' in st.session_state
+            has_selected_range = 'selected_start' in st.session_state and 'selected_end' in st.session_state
+            
+            if not has_clip_range and not has_selected_range:
+                st.warning("⚠️ まず「🔍 シーン検索」でシーンを選択してください。")
+                st.info("💡 シーン検索で気に入ったシーンの「✂️ 選択」ボタンをクリックすると、ここで編集できます。")
             else:
+                # clip_startとclip_endが未設定の場合、selected_startとselected_endを使用
+                if not has_clip_range and has_selected_range:
+                    st.session_state.clip_start = st.session_state.selected_start
+                    st.session_state.clip_end = st.session_state.selected_end
                 # セッションステートの初期化
                 if 'pro_layers' not in st.session_state:
                     st.session_state.pro_layers = []
@@ -2633,8 +1923,8 @@ def main():
                     
                     st.markdown("---")
                     
-                    # Phase 1: マルチレイヤーテキスト
-                    st.subheader("📝 Phase 1: テキストレイヤー")
+                    # テキストレイヤー
+                    st.subheader("📝 テキストレイヤー")
                     
                     with st.expander("➕ 新しいテキストレイヤーを追加", expanded=False):
                         text_content = st.text_area("テキスト内容", "ここにテキストを入力", height=100, key="new_text_content")
@@ -2755,8 +2045,8 @@ def main():
                     
                     st.markdown("---")
                     
-                    # Phase 2: ステッカー
-                    st.subheader("🖼️ Phase 2: ステッカー・画像")
+                    # ステッカー・画像
+                    st.subheader("🖼️ ステッカー・画像")
                     
                     with st.expander("➕ 画像/ステッカーを追加", expanded=False):
                         sticker_file = st.file_uploader("画像をアップロード（PNG, JPG, GIF）", type=['png', 'jpg', 'jpeg', 'gif'], key="new_sticker")
@@ -2829,8 +2119,42 @@ def main():
                     
                     st.markdown("---")
                     
-                    # Phase 3: エフェクト
-                    st.subheader("⚡ Phase 3: エフェクト")
+                    # アニメーション
+                    st.subheader("✨ アニメーション")
+                    
+                    with st.expander("✨ レイヤーにアニメーションを追加", expanded=False):
+                        if not st.session_state.pro_layers:
+                            st.info("まずテキストまたはステッカーレイヤーを追加してください")
+                        else:
+                            layer_options = [f"レイヤー {i+1}: {layer['type']}" for i, layer in enumerate(st.session_state.pro_layers)]
+                            selected_layer_idx = st.selectbox("アニメーションを追加するレイヤー", range(len(layer_options)), format_func=lambda i: layer_options[i], key="anim_layer_select")
+                            
+                            animation_type = st.selectbox(
+                                "アニメーションタイプ",
+                                ["none", "fade_in", "fade_out", "fade_in_out", "slide_in_left", "slide_in_right", "slide_in_top", "slide_in_bottom"],
+                                format_func=lambda x: {
+                                    "none": "なし",
+                                    "fade_in": "フェードイン",
+                                    "fade_out": "フェードアウト",
+                                    "fade_in_out": "フェードイン＆アウト",
+                                    "slide_in_left": "左からスライドイン",
+                                    "slide_in_right": "右からスライドイン",
+                                    "slide_in_top": "上からスライドイン",
+                                    "slide_in_bottom": "下からスライドイン"
+                                }[x],
+                                key="anim_type"
+                            )
+                            
+                            if st.button("✨ アニメーションを適用"):
+                                st.session_state.pro_layers[selected_layer_idx]['animation'] = animation_type
+                                st.success(f"✅ レイヤー{selected_layer_idx+1}にアニメーション「{animation_type}」を適用しました！")
+                                st.rerun()
+                    
+                    st.markdown("---")
+                    st.markdown("---")
+                    
+                    # エフェクト
+                    st.subheader("⚡ エフェクト")
                     
                     with st.expander("⚡ 動画エフェクトを設定", expanded=False):
                         st.write("**速度調整**")
@@ -2912,8 +2236,8 @@ def main():
                     
                     st.markdown("---")
                     
-                    # Phase 4: オーディオ
-                    st.subheader("🎵 Phase 4: オーディオ")
+                    # オーディオ
+                    st.subheader("🎵 オーディオ")
                     
                     with st.expander("🎵 BGMを追加", expanded=False):
                         bgm_file = st.file_uploader("BGM音楽ファイル（MP3, WAV）", type=['mp3', 'wav'], key="new_bgm")
@@ -2953,40 +2277,6 @@ def main():
                                 st.session_state.pro_audio['bgm_path'] = None
                                 st.rerun()
                     
-                    st.markdown("---")
-                    
-                    # Phase 5: アニメーション
-                    st.subheader("✨ Phase 5: アニメーション")
-                    
-                    with st.expander("✨ レイヤーにアニメーションを追加", expanded=False):
-                        if not st.session_state.pro_layers:
-                            st.info("まずテキストまたはステッカーレイヤーを追加してください")
-                        else:
-                            layer_options = [f"レイヤー {i+1}: {layer['type']}" for i, layer in enumerate(st.session_state.pro_layers)]
-                            selected_layer_idx = st.selectbox("アニメーションを追加するレイヤー", range(len(layer_options)), format_func=lambda i: layer_options[i], key="anim_layer_select")
-                            
-                            animation_type = st.selectbox(
-                                "アニメーションタイプ",
-                                ["none", "fade_in", "fade_out", "fade_in_out", "slide_in_left", "slide_in_right", "slide_in_top", "slide_in_bottom"],
-                                format_func=lambda x: {
-                                    "none": "なし",
-                                    "fade_in": "フェードイン",
-                                    "fade_out": "フェードアウト",
-                                    "fade_in_out": "フェードイン＆アウト",
-                                    "slide_in_left": "左からスライドイン",
-                                    "slide_in_right": "右からスライドイン",
-                                    "slide_in_top": "上からスライドイン",
-                                    "slide_in_bottom": "下からスライドイン"
-                                }[x],
-                                key="anim_type"
-                            )
-                            
-                            if st.button("✨ アニメーションを適用"):
-                                st.session_state.pro_layers[selected_layer_idx]['animation'] = animation_type
-                                st.success(f"✅ レイヤー{selected_layer_idx+1}にアニメーション「{animation_type}」を適用しました！")
-                                st.rerun()
-                    
-                    st.markdown("---")
                     
                     # プレビュー生成ボタン
                     st.subheader("🎬 プレビュー")
@@ -3172,6 +2462,8 @@ def main():
                     # 調整後の値を選択
                     st.session_state.selected_start = st.session_state.dialog_adjusted_start
                     st.session_state.selected_end = st.session_state.dialog_adjusted_end
+                    st.session_state.clip_start = st.session_state.dialog_adjusted_start  # プロ編集用
+                    st.session_state.clip_end = st.session_state.dialog_adjusted_end  # プロ編集用
                     st.session_state.scene_preview_dialog_open = False
                     st.session_state.scene_selected = True
                     # スライダーの値をクリアして新しい値を反映させる
