@@ -1194,6 +1194,17 @@ def generate_professional_video(
             audio_stream = audio_stream.filter('volume', original_volume)
             bgm_stream = bgm_stream.filter('volume', bgm_volume)
             
+            # フェードイン・フェードアウト効果
+            fade_in_duration = audio_settings.get('bgm_fade_in', 0.0)
+            fade_out_duration = audio_settings.get('bgm_fade_out', 0.0)
+            
+            if fade_in_duration > 0:
+                bgm_stream = bgm_stream.filter('afade', type='in', start_time=0, duration=fade_in_duration)
+            
+            if fade_out_duration > 0 and bgm_duration > fade_out_duration:
+                fade_out_start = bgm_duration - fade_out_duration
+                bgm_stream = bgm_stream.filter('afade', type='out', start_time=fade_out_start, duration=fade_out_duration)
+            
             # BGMを指定された長さに合わせてループ
             if bgm_duration > 0:
                 bgm_stream = bgm_stream.filter('aloop', loop=-1, size=int(bgm_duration * 44100))
@@ -1895,7 +1906,9 @@ def main():
                         'bgm_volume': 0.5,
                         'original_volume': 1.0,
                         'bgm_start': 0.0,
-                        'bgm_end': None  # None means use full video duration
+                        'bgm_end': None,  # None means use full video duration
+                        'bgm_fade_in': 0.0,  # フェードイン時間（秒）
+                        'bgm_fade_out': 0.0  # フェードアウト時間（秒）
                     }
                 
                 # 2カラムレイアウト: 左側に編集ツール、右側にプレビュー
@@ -1967,115 +1980,8 @@ def main():
                     if total_items > 0:
                         st.write(f"**📚 レイヤー一覧** ({total_items}個)")
                         
-                        # 統合タイムラインスライダー（ビジュアライゼーション）
-                        st.write("**🎬 統合タイムライン**")
-                        
-                        # タイムラインの高さを動的に計算（レイヤー数に応じて）
-                        timeline_height = max(150, total_items * 40)
-                        
-                        # HTMLとCSSで統合タイムラインを描画
-                        timeline_html = f"""
-                        <style>
-                        .timeline-container {{
-                            position: relative;
-                            width: 100%;
-                            height: {timeline_height}px;
-                            background: linear-gradient(90deg, #f0f0f0 0%, #e0e0e0 100%);
-                            border-radius: 10px;
-                            margin: 10px 0;
-                            padding: 10px;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                        }}
-                        .timeline-track {{
-                            position: absolute;
-                            height: 30px;
-                            border-radius: 5px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            font-size: 11px;
-                            font-weight: bold;
-                            color: white;
-                            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-                            overflow: hidden;
-                            text-overflow: ellipsis;
-                            white-space: nowrap;
-                            padding: 0 5px;
-                        }}
-                        .timeline-label {{
-                            position: absolute;
-                            left: 0;
-                            font-size: 10px;
-                            color: #666;
-                            white-space: nowrap;
-                        }}
-                        </style>
-                        <div class="timeline-container">
-                        """
-                        
-                        # 各レイヤーをタイムライン上に配置
-                        y_offset = 5
-                        for i, layer in enumerate(st.session_state.pro_layers):
-                            start_pct = (layer['start'] / clip_duration) * 100
-                            width_pct = ((layer['end'] - layer['start']) / clip_duration) * 100
-                            
-                            if layer['type'] == 'text':
-                                color = "#4CAF50"
-                                icon = "📝"
-                                label = f"{layer['content'][:15]}..."
-                            else:
-                                color = "#2196F3"
-                                icon = "🖼️"
-                                label = Path(layer['path']).stem[:15]
-                            
-                            # アニメーション情報を追加
-                            anim = layer.get('animation', 'none')
-                            anim_text = ""
-                            if anim != 'none':
-                                anim_map = {
-                                    'fade_in': '📈',
-                                    'fade_out': '📉',
-                                    'fade_in_out': '🔄',
-                                    'slide_in_left': '⬅️',
-                                    'slide_in_right': '➡️',
-                                    'slide_in_top': '⬆️',
-                                    'slide_in_bottom': '⬇️'
-                                }
-                                anim_text = f" {anim_map.get(anim, '✨')}"
-                            
-                            timeline_html += f"""
-                            <div class="timeline-track" style="left: {start_pct}%; width: {width_pct}%; top: {y_offset}px; background: {color};">
-                                {icon} {label}{anim_text}
-                            </div>
-                            <div class="timeline-label" style="top: {y_offset}px; left: 2px;">
-                                レイヤー{i+1}
-                            </div>
-                            """
-                            y_offset += 35
-                        
-                        # BGMトラックを追加
-                        if st.session_state.pro_audio.get('bgm_path'):
-                            bgm_start = st.session_state.pro_audio.get('bgm_start', 0.0)
-                            bgm_end = st.session_state.pro_audio.get('bgm_end', clip_duration)
-                            start_pct = (bgm_start / clip_duration) * 100
-                            width_pct = ((bgm_end - bgm_start) / clip_duration) * 100
-                            
-                            timeline_html += f"""
-                            <div class="timeline-track" style="left: {start_pct}%; width: {width_pct}%; top: {y_offset}px; background: #FF9800;">
-                                🎵 BGM
-                            </div>
-                            <div class="timeline-label" style="top: {y_offset}px; left: 2px;">
-                                BGM
-                            </div>
-                            """
-                        
-                        timeline_html += "</div>"
-                        st.markdown(timeline_html, unsafe_allow_html=True)
-                        
-                        # タイムライン凡例
-                        st.caption(f"💡 動画全体: 0.0秒 〜 {clip_duration:.1f}秒 | 📈=フェードイン 📉=フェードアウト ⬅️➡️⬆️⬇️=スライドイン")
-                        
-                        st.markdown("---")
+                        # レイヤー概要を表示
+                        st.caption(f"💡 動画全体: 0.0秒 〜 {clip_duration:.1f}秒")
                         
                         # 個別レイヤーの詳細と微調整
                         for i, layer in enumerate(st.session_state.pro_layers):
@@ -2151,10 +2057,22 @@ def main():
                             with st.expander("🎵 BGM情報", expanded=False):
                                 bgm_start = st.session_state.pro_audio.get('bgm_start', 0.0)
                                 bgm_end = st.session_state.pro_audio.get('bgm_end', clip_duration)
+                                fade_in = st.session_state.pro_audio.get('bgm_fade_in', 0.0)
+                                fade_out = st.session_state.pro_audio.get('bgm_fade_out', 0.0)
+                                
                                 st.write(f"📁 ファイル: {Path(st.session_state.pro_audio['bgm_path']).name}")
                                 st.write(f"⏱️ {bgm_start:.1f}秒 〜 {bgm_end:.1f}秒")
                                 st.write(f"🔊 BGM音量: {st.session_state.pro_audio.get('bgm_volume', 0.5)*100:.0f}%")
                                 st.write(f"🔊 元音声音量: {st.session_state.pro_audio.get('original_volume', 1.0)*100:.0f}%")
+                                
+                                # フェード効果の表示
+                                if fade_in > 0 or fade_out > 0:
+                                    fade_effects = []
+                                    if fade_in > 0:
+                                        fade_effects.append(f"📈 フェードイン: {fade_in:.1f}秒")
+                                    if fade_out > 0:
+                                        fade_effects.append(f"📉 フェードアウト: {fade_out:.1f}秒")
+                                    st.info(" | ".join(fade_effects))
                     
                     st.markdown("---")
 
@@ -2346,7 +2264,6 @@ def main():
                                 st.success(f"✅ ステッカーを追加しました！")
                                 st.rerun()
                     
-                    st.markdown("---")
                     
                     # アニメーション
                     st.subheader("✨ アニメーション")
@@ -2379,8 +2296,6 @@ def main():
                                 st.success(f"✅ レイヤー{selected_layer_idx+1}にアニメーション「{animation_type}」を適用しました！")
                                 st.rerun()
                     
-                    st.markdown("---")
-                    st.markdown("---")
                     
                     # エフェクト
                     st.subheader("⚡ エフェクト")
@@ -2463,7 +2378,6 @@ def main():
                             }
                             st.rerun()
                     
-                    st.markdown("---")
                     
                     # オーディオ
                     st.subheader("🎵 オーディオ")
@@ -2523,6 +2437,40 @@ def main():
                                 key="audio_original_volume"
                             )
                             st.session_state.pro_audio['original_volume'] = original_volume
+                            
+                            st.markdown("---")
+                            st.write("**🎚️ フェードエフェクト**")
+                            
+                            col_fade1, col_fade2 = st.columns(2)
+                            with col_fade1:
+                                fade_in = st.slider(
+                                    "フェードイン（秒）",
+                                    0.0, 5.0,
+                                    st.session_state.pro_audio.get('bgm_fade_in', 0.0),
+                                    0.1,
+                                    key="audio_fade_in",
+                                    help="BGMの開始時にフェードインする時間"
+                                )
+                                st.session_state.pro_audio['bgm_fade_in'] = fade_in
+                            
+                            with col_fade2:
+                                fade_out = st.slider(
+                                    "フェードアウト（秒）",
+                                    0.0, 5.0,
+                                    st.session_state.pro_audio.get('bgm_fade_out', 0.0),
+                                    0.1,
+                                    key="audio_fade_out",
+                                    help="BGMの終了時にフェードアウトする時間"
+                                )
+                                st.session_state.pro_audio['bgm_fade_out'] = fade_out
+                            
+                            if fade_in > 0 or fade_out > 0:
+                                effects_text = []
+                                if fade_in > 0:
+                                    effects_text.append(f"📈 フェードイン: {fade_in:.1f}秒")
+                                if fade_out > 0:
+                                    effects_text.append(f"📉 フェードアウト: {fade_out:.1f}秒")
+                                st.info(" | ".join(effects_text))
                             
                             st.markdown("---")
                             if st.button("🗑️ BGMを削除"):
