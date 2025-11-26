@@ -386,145 +386,61 @@ def download_from_google_drive(file_id: str, output_path: str) -> bool:
 
 
 def download_from_web(url: str, output_path: str) -> bool:
-    """Web URLから動画をダウンロード（yt-dlp + 高度な最適化）
+    """Web URLから動画をダウンロード（yt-dlp使用）
     
-    参考文献:
-    - https://qiita.com/wintyo/items/4dd93221ae4094abd80a
-    - https://gigazine.net/news/20230815-youtube-bypass-download-throttling/
-    
-    実装された機能:
-    - aria2c による並列分割ダウンロード（速度制限回避）
-    - ブラウザcookies利用（年齢制限・地域制限回避）
-    - 並列フラグメントダウンロード
-    - 複数戦略によるフォールバック
+    参考: https://github.com/zararashraf/youtube-video-downloader-api
     """
     
     # 出力パスから拡張子を除去（yt-dlpが自動的に付与）
     output_template = str(Path(output_path).with_suffix(''))
     
-    # aria2c が利用可能かチェック
-    aria2c_available = False
-    try:
-        result = subprocess.run(['aria2c', '--version'], capture_output=True, timeout=5)
-        aria2c_available = result.returncode == 0
-        if aria2c_available:
-            st.success("🚀 aria2c が利用可能です（高速ダウンロードモード）")
-    except:
-        st.info("💡 aria2c が見つかりません。通常モードでダウンロードします")
-    
-    # YoutubeExplodeアプローチを参考にした戦略
-    # 参考: https://github.com/Tyrrrz/YoutubeDownloader
+    # シンプルで堅牢なフォールバック戦略
     strategies = [
         {
-            'name': '🎉 YoutubeExplodeスタイル（最高品質）',
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
-            'postprocessors': [{
-                'key': 'FFmpegVideoConvertor',
-                'preferedformat': 'mp4',
-            }],
-        },
-        {
             'name': '📺 標準HD（720p）',
-            'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]',
-            'postprocessors': [{
-                'key': 'FFmpegVideoConvertor',
-                'preferedformat': 'mp4',
-            }],
+            'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
         },
         {
-            'name': '📱 モバイル画質（480p）',
-            'format': 'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
-            'postprocessors': None,
+            'name': '📱 標準画質（480p）',
+            'format': 'bestvideo[height<=480]+bestaudio/best[height<=480]',
         },
         {
-            'name': '🎬 プログレッシブ（単一ファイル）',
-            'format': 'best[ext=mp4]/best',
-            'postprocessors': None,
-        },
-        {
-            'name': '🆘 最低画質（緊急）',
-            'format': 'worst',
-            'postprocessors': None,
+            'name': '🎬 単一ファイル（best）',
+            'format': 'best',
         }
     ]
     
     for idx, strategy in enumerate(strategies):
-        # aria2cが必要だが利用不可の場合はスキップ
-        if strategy.get('use_aria2c') and not aria2c_available:
-            continue
-            
         try:
             st.info(f"🔄 試行 {idx+1}/{len(strategies)}: {strategy['name']}")
             
-            # YoutubeExplodeアプローチ: 映像+音声を別々に取得してFFmpegでマージ
+            # シンプルで堅牢なyt-dlp設定
             ydl_opts = {
                 'format': strategy['format'],
                 'outtmpl': output_template,
                 'merge_output_format': 'mp4',
-                # 基本設定
-                'quiet': False,
-                'no_warnings': False,
-                'noprogress': False,
-                # ネットワーク設定
-                'socket_timeout': 60,
-                'retries': 15,
-                'fragment_retries': 15,
-                'extractor_retries': 10,
-                'file_access_retries': 5,
-                'skip_unavailable_fragments': True,
-                # ダウンロード最適化
-                'concurrent_fragments': 8,
-                'buffersize': 1024 * 256,  # 256KBバッファ
-                'http_chunk_size': 10485760,  # 10MBチャンク
-                # エラーハンドリング
-                'ignoreerrors': False,
-                'no_abort_on_error': True,
-                # YouTube固有の設定
-                'youtube_include_dash_manifest': True,
-                'youtube_include_hls_manifest': True,
-                # HTTPヘッダー
+                'quiet': True,
+                'no_warnings': True,
+                'socket_timeout': 30,
+                'retries': 5,
+                'fragment_retries': 5,
+                'nocheckcertificate': True,
+                'noplaylist': True,
+                'restrictfilenames': True,
                 'http_headers': {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': 'en-us,en;q=0.5',
-                    'Sec-Fetch-Mode': 'navigate',
-                }
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                },
             }
             
-            # ポストプロセッサーを追加（FFmpegで変換）
-            if strategy.get('postprocessors'):
-                ydl_opts['postprocessors'] = strategy['postprocessors']
-            
-            if idx == 0:
-                st.info(f"📹 動画URL: {url}")
-            
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # 動画情報を取得
-                try:
-                    st.info("🔍 動画情報を取得中...")
-                    info = ydl.extract_info(url, download=False)
-                    video_title = info.get('title', 'Unknown')
-                    duration = info.get('duration', 0)
-                    
-                    # 利用可能なフォーマットを表示
-                    formats = info.get('formats', [])
-                    if idx == 0:
-                        st.success(f"📺 タイトル: {video_title}")
-                        st.info(f"⏱️ 長さ: {duration//60}分{duration%60}秒")
-                        st.info(f"🎬 利用可能なフォーマット: {len(formats)}種類")
-                except Exception as info_error:
-                    st.warning(f"動画情報の取得に失敗: {info_error}")
-                    # 情報取得失敗でもダウンロードは試みる
-                
                 # ダウンロード実行
-                st.info(f"🔽 ダウンロード中... ({strategy['name']})")
                 result = ydl.download([url])
                 
                 if result != 0:
                     raise Exception(f"yt-dlpがエラーコード {result} を返しました")
             
             # ダウンロードされたファイルを確認
-            possible_extensions = ['.mp4', '.webm', '.mkv', '.flv', '.3gp']
+            possible_extensions = ['.mp4', '.webm', '.mkv']
             downloaded_file = None
             
             for ext in possible_extensions:
@@ -535,91 +451,27 @@ def download_from_web(url: str, output_path: str) -> bool:
             
             if not downloaded_file:
                 if idx < len(strategies) - 1:
-                    st.warning(f"⚠️ {strategy['name']}では失敗しました。次の方法を試します...")
+                    st.warning(f"⚠️ 次の方法を試します...")
                     continue
                 else:
-                    st.error("❌ ダウンロードされたファイルが見つかりません")
                     return False
             
-            # 出力パスにリネーム（必要に応じて）
+            # 出力パスにリネーム
             if str(downloaded_file) != output_path:
-                import shutil
                 shutil.move(str(downloaded_file), output_path)
             
-            # ファイルサイズを確認
             file_size = Path(output_path).stat().st_size
             if file_size == 0:
-                st.error("❌ ダウンロードされたファイルが空です")
                 return False
             
-            st.success(f"✅ ダウンロード完了！ ({strategy['name']}, {file_size/1024/1024:.1f}MB)")
+            st.success(f"✅ ダウンロード完了！ ({file_size/1024/1024:.1f}MB)")
             return True
             
-        except yt_dlp.utils.DownloadError as e:
-            error_msg = str(e)
-            
-            # エラー診断を強化
-            if idx < len(strategies) - 1:
-                st.warning(f"⚠️ {strategy['name']}で失敗: {error_msg[:100]}")
-                st.info(f"🔄 次の方法（{strategies[idx+1]['name']}）を試します...")
-                continue
-            
-            # 最後の戦略でもエラーの場合は詳細診断
-            st.error(f"❌ すべての方法でダウンロードに失敗しました")
-            
-            # エラータイプ別の詳細ガイド
-            if "403" in error_msg or "Forbidden" in error_msg:
-                st.error("🚫 **403 Forbidden エラー**")
-                st.markdown("""
-                ### 原因:
-                - YouTubeが直接ダウンロードをブロックしています
-                - 地域制限または著作権保護がかかっています
-                
-                ### 解決方法:
-                1. **推奨**: 上部で「ローカルファイル（推奨）」を選択
-                2. ブラウザ拡張機能で動画をダウンロード:
-                   - [Video DownloadHelper](https://addons.mozilla.org/ja/firefox/addon/video-downloadhelper/)
-                3. デスクトップアプリを使用:
-                   - [4K Video Downloader](https://www.4kdownload.com/ja/products/videodownloader)
-                4. ダウンロードしたファイルをこのアプリにアップロード ✅
-                """)
-            elif "Sign in" in error_msg or "bot" in error_msg.lower():
-                st.error("🤖 **ボット検出エラー**")
-                st.markdown("""
-                ### 原因:
-                - YouTubeがボットによるアクセスを検出しています
-                
-                ### 解決方法:
-                1. **推奨**: 手動ダウンロード→ローカルファイルアップロード
-                2. 5-10分待ってから再試行
-                3. 別の動画で試す
-                4. ブラウザでYouTubeにログインしてから再試行
-                """)
-            elif "Private" in error_msg or "unavailable" in error_msg:
-                st.error("🔒 **動画が利用できません**")
-                st.info("この動画は非公開または削除されている可能性があります")
-            else:
-                st.error(f"❌ **エラー詳細**: {error_msg}")
-            
-            # 全ての戦略を試したか確認
-            if idx >= len(strategies) - 1:
-                return False
-            else:
-                # 次の戦略を試す
-                st.warning(f"⚠️ {strategy['name']}では失敗、次の戦略を試します...")
-                continue
-                
         except Exception as e:
-            if idx >= len(strategies) - 1:
-                st.error(f"❌ Web URLからのダウンロードに失敗しました: {e}")
-                st.info("💡 **代替方法**:")
-                st.info("1. 別の動画URLを試してください")
-                st.info("2. ローカルファイルとしてアップロードしてください")
-                st.info("3. 動画を手動でダウンロード: https://youtube-dl.org/")
-                return False
-            else:
-                st.warning(f"⚠️ {strategy['name']}でエラー: {str(e)[:100]}...")
+            if idx < len(strategies) - 1:
                 continue
+            else:
+                return False
     
     return False
 
@@ -2240,82 +2092,22 @@ def main():
                 st.info("📌 認証情報なしでも、「Web URL（YouTube等）」または「ローカルファイル」は利用できます。")
         
         elif video_source == "Web URL（YouTube等・制限あり）":
-            st.warning("⚠️ **YouTubeからの直接ダウンロードは不安定ですが、高度な最適化を実装しました**")
-            
-            with st.expander("🎬 YoutubeExplodeアプローチを実装（クリックして詳細）", expanded=True):
-                st.markdown("""
-                ### 🎯 実装技術
-                
-                人気のYouTubeダウンローダー [YoutubeDownloader](https://github.com/Tyrrrz/YoutubeDownloader) のアプローチを参考に実装しました。
-                
-                #### ✨ 主要な機能:
-                
-                **1. 🎬 適応型ストリーム（Adaptive Streams）**
-                - 映像ストリームと音声ストリームを別々にダウンロード
-                - FFmpegで高品質マージ
-                - 最高品質の映像＋最高品質の音声を組み合わせ可能
-                
-                **2. 📊 複数フォーマット戦略**
-                - YoutubeExplodeスタイル（最高品質）
-                - 標準HD（720p）
-                - モバイル画質（480p）
-                - プログレッシブ（単一ファイル）
-                - 最低画質（緊急用）
-                
-                **3. 🔧 高度な設定**
-                - concurrent_fragments: 8並列
-                - buffersize: 256KB
-                - http_chunk_size: 10MB
-                - 最大15回リトライ
-                - DASH/HLSマニフェスト対応
-                
-                **4. 🎥 FFmpeg後処理**
-                - 映像+音声の自動マージ
-                - MP4コンテナへの変換
-                - メタデータの保持
-                
-                #### 📈 期待される改善:
-                - **安定性**: 環境依存を排除（aria2c/Cookie不要）
-                - **品質**: 最高品質の映像＋音声を取得
-                - **互換性**: すべての環境で動作
-                - **成功率**: 50-70%（環境により変動）
-                
-                ---
-                
-                ### 🎯 それでも失敗する場合の代替方法:
-                
-                #### ✅ 方法1: ブラウザ拡張機能（最も簡単）
-                1. **Video DownloadHelper**（Firefox/Chrome）
-                   - [Firefox版](https://addons.mozilla.org/ja/firefox/addon/video-downloadhelper/)
-                   - [Chrome版](https://chrome.google.com/webstore/detail/video-downloadhelper/)
-                2. YouTube動画を開いてダウンロード
-                3. このアプリで「**ローカルファイル（推奨）**」を選択
-                
-                #### ✅ 方法2: 4K Video Downloader（高品質）
-                1. [公式サイト](https://www.4kdownload.com/ja/products/videodownloader)
-                2. YouTube URLを貼り付けてダウンロード
-                3. このアプリで「**ローカルファイル（推奨）**」を選択
-                
-                #### ✅ 方法3: オンラインサービス（登録不要）
-                1. [Y2Mate](https://www.y2mate.com/jp) / [SaveFrom.net](https://ja.savefrom.net/)
-                2. YouTube URLを貼り付けてダウンロード
-                3. このアプリで「**ローカルファイル（推奨）**」を選択
-                """)
+            st.warning("⚠️ **YouTubeからの直接ダウンロードは不安定です**")
+            st.info("💡 失敗した場合は、SaveFrom.netなどで手動ダウンロード→ローカルファイルアップロードをご利用ください")
             
             web_url = st.text_input(
-                "動画URL（最適化技術を使用）", 
+                "動画URL", 
                 placeholder="https://www.youtube.com/watch?v=...",
-                help="aria2c + Cookie認証 + 並列ダウンロードで処理します。成功率: 60-80%"
+                help="yt-dlpで動画をダウンロードします"
             )
             
             col1, col2 = st.columns([2, 1])
             with col1:
-                if st.button("🚀 最適化ダウンロードを実行", type="primary"):
+                if st.button("📥 ダウンロード実行", type="primary"):
                     if not web_url:
                         st.error("❌ URLを入力してください")
                     else:
-                        st.info("🔄 最適化技術を使用してダウンロード中...")
-                        st.caption("💡 aria2c + Cookie認証 + 並列フラグメントで処理します")
+                        st.info("🔄 ダウンロード中...")
                         output_path = str(TEMP_VIDEOS_DIR / "video_web.mp4")
                         if download_from_web(web_url, output_path):
                             st.session_state.video_path = output_path
@@ -2323,34 +2115,17 @@ def main():
                             st.balloons()
                             st.rerun()
                         else:
-                            st.error("❌ すべてのダウンロード戦略が失敗しました")
-                            st.warning("⚠️ YouTube側の制限により、このURLからの直接ダウンロードができませんでした")
-                            
-                            with st.expander("🔍 失敗の主な原因", expanded=True):
-                                st.markdown("""
-                                ### 考えられる原因:
-                                - 🔒 **著作権保護**: 音楽動画やTV番組など
-                                - 🌍 **地域制限**: 日本からアクセスできない動画
-                                - 🔞 **年齢制限**: 18歳以上確認が必要（Cookie認証も失敗）
-                                - 📺 **プレミアム限定**: YouTube Premium会員専用
-                                - 🔴 **ライブ配信**: 現在配信中またはアーカイブ準備中
-                                - 🚫 **アクセス制限**: 非公開または限定公開動画
-                                """)
-                            
-                            st.info("💡 **確実な代替方法をお試しください**")
+                            st.error("❌ ダウンロードに失敗しました")
                             st.markdown("""
-                            ### 📌 今すぐできる対処法（3ステップ）:
+                            ### 📌 代替方法
                             
-                            **Step 1**: 上部の「動画取得方法」で「**ローカルファイル（推奨）**」を選択
+                            **https://ja.savefrom.net/1-youtube-video-downloader-175dk.html を使ってローカルに動画をダウンロードした上で、手動でアップロードしてください。**
                             
-                            **Step 2**: 以下のいずれかの方法でYouTube動画をダウンロード
-                            - 🔧 **Video DownloadHelper** (ブラウザ拡張 - 最も簡単)
-                            - 💎 **4K Video Downloader** (デスクトップアプリ - 高品質)
-                            - 🌐 **Y2Mate / SaveFrom** (オンラインサービス - 登録不要)
-                            
-                            **Step 3**: ダウンロードしたMP4ファイルをアップロード
-                            
-                            ✅ **この方法なら100%確実に処理できます！**
+                            **手順:**
+                            1. [SaveFrom.net](https://ja.savefrom.net/1-youtube-video-downloader-175dk.html) にアクセス
+                            2. YouTube URLを貼り付けてダウンロード
+                            3. 上部の「動画取得方法」で「**ローカルファイル（推奨）**」を選択
+                            4. ダウンロードしたMP4ファイルをアップロード
                             """)
             
             with col2:
