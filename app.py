@@ -44,81 +44,102 @@ TEXT_BACKGROUNDS_DIR = Path("./text_backgrounds")  # テキストレイヤー背
 for dir_path in [FONTS_DIR, TEMP_VIDEOS_DIR, TEMP_IMAGES_DIR, TEMP_AUDIOS_DIR, CHROMADB_DIR, TEXT_BACKGROUNDS_DIR]:
     dir_path.mkdir(exist_ok=True, parents=True)
 
-# Google Fonts 全日本語フォントリスト（2024年12月時点）
-# 軽量化のため、オンデマンドでダウンロード
-GOOGLE_FONTS_JAPANESE = {
-    # ゴシック体
+# Google Fonts カテゴリー別フォントリスト（日本語対応フォント全種類）
+# 5つのカテゴリーに分類: 普通、スタイリッシュ、漫画風、古風・和風、その他
+
+# カテゴリー1: 普通（読みやすく汎用的なゴシック・明朝体）
+FONTS_NORMAL = {
     "Noto Sans JP": "https://github.com/google/fonts/raw/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf",
+    "Noto Serif JP": "https://github.com/google/fonts/raw/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf",
     "M PLUS 1": "https://github.com/google/fonts/raw/main/ofl/mplus1/MPLUS1%5Bwght%5D.ttf",
     "M PLUS 1p": "https://github.com/google/fonts/raw/main/ofl/mplus1p/MPLUS1p-Regular.ttf",
     "M PLUS 2": "https://github.com/google/fonts/raw/main/ofl/mplus2/MPLUS2%5Bwght%5D.ttf",
-    "M PLUS 1 Code": "https://github.com/google/fonts/raw/main/ofl/mplus1code/MPLUS1Code%5Bwght%5D.ttf",
     "M PLUS Rounded 1c": "https://github.com/google/fonts/raw/main/ofl/mplusrounded1c/MPLUSRounded1c-Regular.ttf",
-    "M PLUS Code Latin": "https://github.com/google/fonts/raw/main/ofl/mpluscodelatrin/MPLUSCodeLatin%5Bwght%5D.ttf",
     "Kosugi": "https://github.com/google/fonts/raw/main/apache/kosugi/Kosugi-Regular.ttf",
     "Kosugi Maru": "https://github.com/google/fonts/raw/main/apache/kosugimaru/KosugiMaru-Regular.ttf",
     "Sawarabi Gothic": "https://github.com/google/fonts/raw/main/ofl/sawarabigothic/SawarabiGothic-Regular.ttf",
+    "Sawarabi Mincho": "https://github.com/google/fonts/raw/main/ofl/sawarabimincho/SawarabiMincho-Regular.ttf",
+    "BIZ UDGothic": "https://github.com/google/fonts/raw/main/ofl/bizudgothic/BIZUDGothic-Regular.ttf",
+    "BIZ UDPGothic": "https://github.com/google/fonts/raw/main/ofl/bizudpgothic/BIZUDPGothic-Regular.ttf",
+    "BIZ UDMincho": "https://github.com/google/fonts/raw/main/ofl/bizudmincho/BIZUDMincho-Regular.ttf",
+    "BIZ UDPMincho": "https://github.com/google/fonts/raw/main/ofl/bizudpmincho/BIZUDPMincho-Regular.ttf",
+    "Kiwi Maru": "https://github.com/google/fonts/raw/main/ofl/kiwimaru/KiwiMaru-Regular.ttf",
+    "Murecho": "https://github.com/google/fonts/raw/main/ofl/murecho/Murecho%5Bwght%5D.ttf",
+}
+
+# カテゴリー2: スタイリッシュ（モダン・都会的・洗練されたデザイン）
+FONTS_STYLISH = {
     "Zen Kaku Gothic New": "https://github.com/google/fonts/raw/main/ofl/zenkakugothicnew/ZenKakuGothicNew-Regular.ttf",
     "Zen Kaku Gothic Antique": "https://github.com/google/fonts/raw/main/ofl/zenkakugothicantique/ZenKakuGothicAntique-Regular.ttf",
     "Zen Maru Gothic": "https://github.com/google/fonts/raw/main/ofl/zenmarugothic/ZenMaruGothic-Regular.ttf",
-    "Murecho": "https://github.com/google/fonts/raw/main/ofl/murecho/Murecho%5Bwght%5D.ttf",
     "Stick": "https://github.com/google/fonts/raw/main/apache/stick/Stick-Regular.ttf",
-    "BIZ UDGothic": "https://github.com/google/fonts/raw/main/ofl/bizudgothic/BIZUDGothic-Regular.ttf",
-    "BIZ UDPGothic": "https://github.com/google/fonts/raw/main/ofl/bizudpgothic/BIZUDPGothic-Regular.ttf",
-    "Kiwi Maru": "https://github.com/google/fonts/raw/main/ofl/kiwimaru/KiwiMaru-Regular.ttf",
+    "M PLUS 1 Code": "https://github.com/google/fonts/raw/main/ofl/mplus1code/MPLUS1Code%5Bwght%5D.ttf",
+    "Shippori Antique": "https://github.com/google/fonts/raw/main/ofl/shipporiantique/ShipporiAntique-Regular.ttf",
+    "Zen Dots": "https://github.com/google/fonts/raw/main/ofl/zendots/ZenDots-Regular.ttf",
+    "Zen Kurenaido": "https://github.com/google/fonts/raw/main/ofl/zenkurenaido/ZenKurenaido-Regular.ttf",
+    "Zen Loop": "https://github.com/google/fonts/raw/main/ofl/zenloop/ZenLoop-Regular.ttf",
+    "DotGothic16": "https://github.com/google/fonts/raw/main/ofl/dotgothic16/DotGothic16-Regular.ttf",
+    "RocknRoll One": "https://github.com/google/fonts/raw/main/ofl/rocknrollone/RocknRollOne-Regular.ttf",
+    "Train One": "https://github.com/google/fonts/raw/main/ofl/trainone/TrainOne-Regular.ttf",
+}
+
+# カテゴリー3: 漫画風（ポップ・可愛い・インパクト）
+FONTS_COMIC = {
     "Mochiy Pop One": "https://github.com/google/fonts/raw/main/ofl/mochiypopone/MochiyPopOne-Regular.ttf",
     "Mochiy Pop P One": "https://github.com/google/fonts/raw/main/ofl/mochiypoppone/MochiyPopPOne-Regular.ttf",
     "Dela Gothic One": "https://github.com/google/fonts/raw/main/ofl/delagothicone/DelaGothicOne-Regular.ttf",
-    
-    # 明朝体
-    "Noto Serif JP": "https://github.com/google/fonts/raw/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf",
-    "Sawarabi Mincho": "https://github.com/google/fonts/raw/main/ofl/sawarabimincho/SawarabiMincho-Regular.ttf",
+    "Hachi Maru Pop": "https://github.com/google/fonts/raw/main/ofl/hachimarupop/HachiMaruPop-Regular.ttf",
+    "Potta One": "https://github.com/google/fonts/raw/main/ofl/pottaone/PottaOne-Regular.ttf",
+    "Reggae One": "https://github.com/google/fonts/raw/main/ofl/reggaeone/ReggaeOne-Regular.ttf",
+    "Rampart One": "https://github.com/google/fonts/raw/main/ofl/rampartone/RampartOne-Regular.ttf",
+    "Darumadrop One": "https://github.com/google/fonts/raw/main/ofl/darumadropone/DarumadropOne-Regular.ttf",
+    "Cherry Bomb One": "https://github.com/google/fonts/raw/main/ofl/cherrybombone/CherryBombOne-Regular.ttf",
+    "Slackside One": "https://github.com/google/fonts/raw/main/ofl/slacksideone/SlacksideOne-Regular.ttf",
+}
+
+# カテゴリー4: 古風・和風（伝統的・書道風・和の雰囲気）
+FONTS_TRADITIONAL = {
     "Shippori Mincho": "https://github.com/google/fonts/raw/main/ofl/shipporimincho/ShipporiMincho-Regular.ttf",
     "Shippori Mincho B1": "https://github.com/google/fonts/raw/main/ofl/shipporiminchob1/ShipporiMinchoB1-Regular.ttf",
     "Zen Antique": "https://github.com/google/fonts/raw/main/ofl/zenantique/ZenAntique-Regular.ttf",
     "Zen Antique Soft": "https://github.com/google/fonts/raw/main/ofl/zenantiquesoft/ZenAntiqueSoft-Regular.ttf",
     "Zen Old Mincho": "https://github.com/google/fonts/raw/main/ofl/zenoldmincho/ZenOldMincho-Regular.ttf",
-    "BIZ UDMincho": "https://github.com/google/fonts/raw/main/ofl/bizudmincho/BIZUDMincho-Regular.ttf",
-    "BIZ UDPMincho": "https://github.com/google/fonts/raw/main/ofl/bizudpmincho/BIZUDPMincho-Regular.ttf",
     "Kaisei Tokumin": "https://github.com/google/fonts/raw/main/ofl/kaiseitokumin/KaiseiTokumin-Regular.ttf",
     "Kaisei Opti": "https://github.com/google/fonts/raw/main/ofl/kaiseiopti/KaiseiOpti-Regular.ttf",
     "Kaisei HarunoUmi": "https://github.com/google/fonts/raw/main/ofl/kaiseiharunoumi/KaiseiHarunoUmi-Regular.ttf",
     "Kaisei Decol": "https://github.com/google/fonts/raw/main/ofl/kaiseidecol/KaiseiDecol-Regular.ttf",
-    
-    # 手書き・カジュアル
-    "Hachi Maru Pop": "https://github.com/google/fonts/raw/main/ofl/hachimarupop/HachiMaruPop-Regular.ttf",
-    "Yusei Magic": "https://github.com/google/fonts/raw/main/ofl/yuseimagic/YuseiMagic-Regular.ttf",
-    "Klee One": "https://github.com/google/fonts/raw/main/ofl/kleeone/KleeOne-Regular.ttf",
-    "Yomogi": "https://github.com/google/fonts/raw/main/ofl/yomogi/Yomogi-Regular.ttf",
-    "Potta One": "https://github.com/google/fonts/raw/main/ofl/pottaone/PottaOne-Regular.ttf",
-    "Dela Gothic One": "https://github.com/google/fonts/raw/main/ofl/delagothicone/DelaGothicOne-Regular.ttf",
-    "Reggae One": "https://github.com/google/fonts/raw/main/ofl/reggaeone/ReggaeOne-Regular.ttf",
-    "RocknRoll One": "https://github.com/google/fonts/raw/main/ofl/rocknrollone/RocknRollOne-Regular.ttf",
     "New Tegomin": "https://github.com/google/fonts/raw/main/ofl/newtegomin/NewTegomin-Regular.ttf",
     "Yuji Syuku": "https://github.com/google/fonts/raw/main/ofl/yujisyuku/YujiSyuku-Regular.ttf",
     "Yuji Boku": "https://github.com/google/fonts/raw/main/ofl/yujiboku/YujiBoku-Regular.ttf",
     "Yuji Mai": "https://github.com/google/fonts/raw/main/ofl/yujimai/YujiMai-Regular.ttf",
     "Yuji Hentaigana Akari": "https://github.com/google/fonts/raw/main/ofl/yujihentaiganaakari/YujiHentaiganaAkari-Regular.ttf",
     "Yuji Hentaigana Akebono": "https://github.com/google/fonts/raw/main/ofl/yujihentaiganaakebono/YujiHentaiganaAkebono-Regular.ttf",
-    
-    # ポップ・装飾
-    "Rampart One": "https://github.com/google/fonts/raw/main/ofl/rampartone/RampartOne-Regular.ttf",
-    "Train One": "https://github.com/google/fonts/raw/main/ofl/trainone/TrainOne-Regular.ttf",
-    "DotGothic16": "https://github.com/google/fonts/raw/main/ofl/dotgothic16/DotGothic16-Regular.ttf",
     "Shizuru": "https://github.com/google/fonts/raw/main/ofl/shizuru/Shizuru-Regular.ttf",
-    "Darumadrop One": "https://github.com/google/fonts/raw/main/ofl/darumadropone/DarumadropOne-Regular.ttf",
-    "Shippori Antique": "https://github.com/google/fonts/raw/main/ofl/shipporiantique/ShipporiAntique-Regular.ttf",
-    "Slackside One": "https://github.com/google/fonts/raw/main/ofl/slacksideone/SlacksideOne-Regular.ttf",
-    "Yatra One": "https://github.com/google/fonts/raw/main/ofl/yatraone/YatraOne-Regular.ttf",
-    "Cherry Bomb One": "https://github.com/google/fonts/raw/main/ofl/cherrybombone/CherryBombOne-Regular.ttf",
-    "Nunito": "https://github.com/google/fonts/raw/main/ofl/nunito/Nunito%5Bwght%5D.ttf",
-    "Zen Kurenaido": "https://github.com/google/fonts/raw/main/ofl/zenkurenaido/ZenKurenaido-Regular.ttf",
-    "Zen Loop": "https://github.com/google/fonts/raw/main/ofl/zenloop/ZenLoop-Regular.ttf",
-    "Zen Dots": "https://github.com/google/fonts/raw/main/ofl/zendots/ZenDots-Regular.ttf"
 }
 
-# 後方互換性のため
+# カテゴリー5: その他（手書き風・ユニーク・特殊）
+FONTS_OTHERS = {
+    "Yusei Magic": "https://github.com/google/fonts/raw/main/ofl/yuseimagic/YuseiMagic-Regular.ttf",
+    "Klee One": "https://github.com/google/fonts/raw/main/ofl/kleeone/KleeOne-Regular.ttf",
+    "Yomogi": "https://github.com/google/fonts/raw/main/ofl/yomogi/Yomogi-Regular.ttf",
+    "Yatra One": "https://github.com/google/fonts/raw/main/ofl/yatraone/YatraOne-Regular.ttf",
+}
+
+# すべてのフォントを統合（後方互換性のため）
+GOOGLE_FONTS_JAPANESE = {}
+for category_fonts in [FONTS_NORMAL, FONTS_STYLISH, FONTS_COMIC, FONTS_TRADITIONAL, FONTS_OTHERS]:
+    GOOGLE_FONTS_JAPANESE.update(category_fonts)
+
 JAPANESE_FONTS = GOOGLE_FONTS_JAPANESE
+
+# カテゴリー情報
+FONT_CATEGORIES = {
+    "📖 普通": FONTS_NORMAL,
+    "✨ スタイリッシュ": FONTS_STYLISH,
+    "🎨 漫画風": FONTS_COMIC,
+    "🏯 古風・和風": FONTS_TRADITIONAL,
+    "🌟 その他": FONTS_OTHERS
+}
 
 def download_font(font_name: str, font_url: str) -> bool:
     """単一フォントをオンデマンドでダウンロード"""
@@ -2354,22 +2375,25 @@ def main():
                     with st.expander("➕ 新しいテキストレイヤーを追加", expanded=False):
                         text_content = st.text_area("テキスト内容", "ここにテキストを入力", height=100, key="new_text_content")
                         
-                        # フォント選択（視覚的プレビュー付き）
+                        # フォント選択（カテゴリー別・視覚的プレビュー付き）
                         st.write("**🎨 フォント選択**")
-                        japanese_fonts = get_japanese_fonts_dict()
                         
-                        if japanese_fonts:
-                            # カスタムプレビューテキスト
-                            preview_text = "ふぉんと・フォント・Font！？"
-                            
-                            # セッション状態でフォント選択を管理
-                            if 'selected_font_for_new_layer' not in st.session_state:
-                                st.session_state.selected_font_for_new_layer = list(japanese_fonts.keys())[0]
-                            
-                            # フォント一覧を展開可能なセクションで表示
-                            with st.expander("📚 フォント一覧から選択（クリックしてプレビュー）", expanded=True):
+                        # カスタムプレビューテキスト
+                        preview_text = "ふぉんと・フォント・Font、本当！？"
+                        
+                        # セッション状態でフォント選択を管理
+                        if 'selected_font_for_new_layer' not in st.session_state:
+                            st.session_state.selected_font_for_new_layer = list(GOOGLE_FONTS_JAPANESE.keys())[0]
+                        
+                        # カテゴリー選択タブ
+                        category_tabs = st.tabs(list(FONT_CATEGORIES.keys()))
+                        
+                        for tab_idx, (category_name, category_fonts) in enumerate(FONT_CATEGORIES.items()):
+                            with category_tabs[tab_idx]:
+                                st.caption(f"{len(category_fonts)}種類のフォント")
+                                
                                 # 3列レイアウトで表示
-                                font_list = list(japanese_fonts.keys())
+                                font_list = list(category_fonts.keys())
                                 cols_per_row = 3
                                 
                                 for i in range(0, len(font_list), cols_per_row):
@@ -2377,17 +2401,18 @@ def main():
                                     for j, col in enumerate(cols):
                                         if i + j < len(font_list):
                                             font_name = font_list[i + j]
+                                            font_url = category_fonts[font_name]
+                                            
                                             with col:
-                                                # フォントボタンでプレビュー画像を表示
-                                                font_file = japanese_fonts[font_name]
+                                                font_file = font_name.replace(" ", "_") + ".ttf"
                                                 font_path = FONTS_DIR / font_file
                                                 
                                                 # フォントが存在する場合のみプレビュー生成
                                                 if font_path.exists():
-                                                    preview_img = generate_font_preview(str(font_path), preview_text, size=28)
+                                                    preview_img = generate_font_preview(str(font_path), preview_text, size=24)
                                                     
                                                     # ボタンとして画像を表示
-                                                    if st.button(f"{font_name}", key=f"font_btn_{i}_{j}", use_container_width=True):
+                                                    if st.button(f"{font_name}", key=f"font_cat_{tab_idx}_{i}_{j}", use_container_width=True):
                                                         st.session_state.selected_font_for_new_layer = font_name
                                                         st.rerun()
                                                     
@@ -2399,27 +2424,26 @@ def main():
                                                         st.image(preview_img, use_container_width=True)
                                                 else:
                                                     # フォントが未ダウンロードの場合
-                                                    if st.button(f"📥 {font_name}", key=f"font_dl_{i}_{j}", use_container_width=True):
+                                                    if st.button(f"📥 {font_name}", key=f"font_dl_cat_{tab_idx}_{i}_{j}", use_container_width=True):
                                                         # オンデマンドでダウンロード
                                                         with st.spinner(f"{font_name} をダウンロード中..."):
-                                                            if download_font(font_name, japanese_fonts[font_name]):
+                                                            if download_font(font_name, font_url):
                                                                 st.session_state.selected_font_for_new_layer = font_name
                                                                 st.success(f"✅ {font_name} をダウンロードしました")
                                                                 st.rerun()
                                                     st.caption("クリックでダウンロード")
-                            
-                            selected_font_name = st.session_state.selected_font_for_new_layer
-                            selected_font_file = japanese_fonts[selected_font_name]
-                            
-                            # 選択中のフォントを大きく表示
-                            st.info(f"**選択中のフォント**: {selected_font_name}")
-                            font_path = FONTS_DIR / selected_font_file
-                            if font_path.exists():
-                                large_preview = generate_font_preview(str(font_path), text_content if text_content else preview_text, size=40)
-                                st.image(large_preview, caption=f"{selected_font_name} の大きなプレビュー", use_container_width=True)
+                        
+                        # 選択中のフォントを大きく表示
+                        selected_font_name = st.session_state.selected_font_for_new_layer
+                        selected_font_file = selected_font_name.replace(" ", "_") + ".ttf"
+                        
+                        st.info(f"**選択中のフォント**: {selected_font_name}")
+                        font_path = FONTS_DIR / selected_font_file
+                        if font_path.exists():
+                            large_preview = generate_font_preview(str(font_path), text_content if text_content else preview_text, size=40)
+                            st.image(large_preview, caption=f"{selected_font_name} の大きなプレビュー", use_container_width=True)
                         else:
-                            st.warning("日本語フォントが見つかりません。デフォルトフォントを使用します。")
-                            selected_font_file = "Noto_Sans_JP.ttf"
+                            st.warning(f"{selected_font_name} をダウンロードしてください")
                         
                         st.markdown("---")
                         
