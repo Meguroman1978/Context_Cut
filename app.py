@@ -2292,9 +2292,7 @@ def main():
         # 文字起こし完了後のメイン画面
         elif st.session_state.transcription is not None:
             st.success("✅ 動画の取得と文字起こしが完了しました！")
-            st.info("💡 下のタブから「シーン検索」または「動画編集」を選択してください
-                   - シーン検索と動画編集のタブが表示されます
-                """)
+            st.info("💡 下のタブから「シーン検索」または「動画編集」を選択してください")
     
     if st.session_state.video_path and st.session_state.transcription is not None:
         
