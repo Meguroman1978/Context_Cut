@@ -1473,29 +1473,58 @@ def generate_professional_video(
                 if bg_opacity < 1.0:
                     bg_stream = bg_stream.filter('format', 'yuva420p').filter('colorchannelmixer', aa=bg_opacity)
                 
-                # 背景画像を配置
-                # プリセット位置の場合、式を含む座標をシンプルな配置に変換
+                # 背景画像の位置計算（テキストに自動追従）
                 is_preset = text_layer.get('is_preset_position', False)
-                bg_x = text_layer['x']
-                bg_y = text_layer['y']
+                position_preset = text_layer.get('position_preset')
+                text_x_expr = str(text_layer['x'])
+                text_y_expr = str(text_layer['y'])
                 bg_x_offset = text_layer.get('background_x_offset', 0)
                 bg_y_offset = text_layer.get('background_y_offset', 0)
                 
-                if is_preset:
-                    # プリセット位置の場合、中央配置を使用
-                    # overlayフィルター用の式に変換（text_w/text_hは使えない）
-                    if 'text_w' in str(bg_x) or 'text_h' in str(bg_y):
-                        # 中央配置: (main_w - overlay_w) / 2
+                # プリセット位置の場合、テキスト位置に基づいて背景を配置
+                if is_preset and position_preset:
+                    # テキストの位置マッピング（drawtextフィルターの座標系）
+                    # 背景画像はテキストの中心に配置（overlayフィルターの座標系）
+                    if position_preset == "下部中央":
+                        # テキスト: (w-text_w)/2, h-text_h-50
+                        # 背景: テキストを中心に配置
+                        bg_x = f"(main_w-overlay_w)/2+{bg_x_offset}"
+                        bg_y = f"main_h-overlay_h-50+{bg_y_offset}"
+                    elif position_preset == "上部中央":
+                        bg_x = f"(main_w-overlay_w)/2+{bg_x_offset}"
+                        bg_y = f"50+{bg_y_offset}"
+                    elif position_preset == "中央":
                         bg_x = f"(main_w-overlay_w)/2+{bg_x_offset}"
                         bg_y = f"(main_h-overlay_h)/2+{bg_y_offset}"
+                    elif position_preset == "左上":
+                        bg_x = f"50+{bg_x_offset}"
+                        bg_y = f"50+{bg_y_offset}"
+                    elif position_preset == "右上":
+                        bg_x = f"main_w-overlay_w-50+{bg_x_offset}"
+                        bg_y = f"50+{bg_y_offset}"
+                    elif position_preset == "左下":
+                        bg_x = f"50+{bg_x_offset}"
+                        bg_y = f"main_h-overlay_h-50+{bg_y_offset}"
+                    elif position_preset == "右下":
+                        bg_x = f"main_w-overlay_w-50+{bg_x_offset}"
+                        bg_y = f"main_h-overlay_h-50+{bg_y_offset}"
                     else:
-                        # 数値指定の場合はそのまま使用
-                        bg_x = str(bg_x)
-                        bg_y = str(bg_y)
+                        # フォールバック: 中央配置
+                        bg_x = f"(main_w-overlay_w)/2+{bg_x_offset}"
+                        bg_y = f"(main_h-overlay_h)/2+{bg_y_offset}"
                 else:
-                    # 数値指定の場合
-                    bg_x = str(bg_x)
-                    bg_y = str(bg_y)
+                    # 数値指定の場合: テキストの座標に合わせて背景を配置
+                    # テキストが背景の中心に来るように調整
+                    try:
+                        text_x_num = int(text_x_expr)
+                        text_y_num = int(text_y_expr)
+                        # 背景をテキストの少し後ろ（左上）に配置してテキストを中心に
+                        bg_x = f"{text_x_num - 50 + bg_x_offset}"
+                        bg_y = f"{text_y_num - 30 + bg_y_offset}"
+                    except:
+                        # 式の場合はそのまま使用
+                        bg_x = f"{text_x_expr}+{bg_x_offset}"
+                        bg_y = f"{text_y_expr}+{bg_y_offset}"
                 
                 bg_enable_expr = f"between(t,{text_layer['start']},{text_layer['end']})"
                 
@@ -2990,20 +3019,40 @@ def main():
                         
                         # 背景画像が設定されている場合の調整オプション
                         if text_bg_path:
+                            st.info("💡 背景画像はテキストに自動追従します。サイズと位置を調整できます。")
+                            
                             col_bg1, col_bg2 = st.columns(2)
                             with col_bg1:
                                 text_bg_scale = st.slider(
                                     "背景サイズ（%）",
-                                    50, 300, 100, 5,
+                                    50, 300, 150, 5,
                                     key="text_bg_scale",
-                                    help="背景画像のサイズを調整"
+                                    help="背景画像のサイズを調整（テキストより大きめがおすすめ）"
                                 ) / 100.0
                             with col_bg2:
                                 text_bg_opacity = st.slider(
                                     "背景の透明度",
-                                    0.0, 1.0, 0.8, 0.1,
+                                    0.0, 1.0, 0.9, 0.1,
                                     key="text_bg_opacity",
                                     help="0.0=完全透明、1.0=完全不透明"
+                                )
+                            
+                            # 背景とテキストの相対位置調整
+                            st.write("**🔧 背景とテキストの位置微調整**")
+                            col_offset1, col_offset2 = st.columns(2)
+                            with col_offset1:
+                                bg_x_fine_offset = st.slider(
+                                    "左右オフセット（px）",
+                                    -200, 200, 0, 10,
+                                    key="text_bg_x_offset",
+                                    help="背景をテキストに対して左右に移動"
+                                )
+                            with col_offset2:
+                                bg_y_fine_offset = st.slider(
+                                    "上下オフセット（px）",
+                                    -200, 200, 0, 10,
+                                    key="text_bg_y_offset",
+                                    help="背景をテキストに対して上下に移動"
                                 )
                         
                         st.markdown("---")
@@ -3046,15 +3095,9 @@ def main():
                             y = str(text_y_px)
                         
                         if st.button("➕ テキストレイヤーを追加", type="primary"):
-                            # 背景画像用の位置を計算（プリセット位置の場合）
-                            bg_x_offset = 0
-                            bg_y_offset = 0
-                            
-                            # プリセット位置の場合、背景を中央配置にするためのオフセット
-                            if position_mode == "🎯 プリセット" and text_bg_path:
-                                if text_position in ["下部中央", "上部中央", "中央"]:
-                                    # 中央寄せの場合、背景も中央に配置
-                                    bg_x_offset = -50  # 背景を少し左にオフセット
+                            # 背景画像用の位置オフセット（UIで設定した値を使用）
+                            bg_x_offset = bg_x_fine_offset if text_bg_path else 0
+                            bg_y_offset = bg_y_fine_offset if text_bg_path else 0
                                 
                             new_layer = {
                                 'type': 'text',
@@ -3072,7 +3115,8 @@ def main():
                                 'background_opacity': text_bg_opacity,
                                 'background_x_offset': bg_x_offset,
                                 'background_y_offset': bg_y_offset,
-                                'is_preset_position': position_mode == "🎯 プリセット"
+                                'is_preset_position': position_mode == "🎯 プリセット",
+                                'position_preset': text_position if position_mode == "🎯 プリセット" else None
                             }
                             st.session_state.pro_layers.append(new_layer)
                             st.success(f"✅ テキストレイヤーを追加しました！")
