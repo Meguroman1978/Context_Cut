@@ -1,5 +1,5 @@
 """
-Context Cut Pro - AI動画自動切り抜き＆テロップ編集ツール
+Context Cut Pro - 切り抜き動画生成＆編集ツール
 Streamlit Community Cloud デプロイ対応版
 """
 
@@ -822,26 +822,14 @@ def generate_search_suggestions(transcript_text: str, max_suggestions: int = 10)
     text_lower = transcript_text.lower()
     matched_queries = []
     
-    # キーワードパターンに基づいて優先クエリを抽出
+    # キーワードパターンに基づいて優先クエリを抽出（実際に動画に含まれる内容のみ）
     for keyword, query in keyword_patterns.items():
         if keyword in text_lower and query not in matched_queries:
             matched_queries.append(query)
     
-    # マッチしたクエリが少ない場合、具体的な汎用候補を追加
-    # 注意: 曖昧な表現（「具体例を挙げている箇所」「まとめている箇所」など）は使用しない
-    if len(matched_queries) < 3:
-        generic_suggestions = [
-            "製品・サービスの特徴について説明している箇所",
-            "使い方・操作方法について説明している箇所",
-            "注意事項・重要事項について説明している箇所",
-            "メリット・効果について説明している箇所",
-            "価格・料金について説明している箇所"
-        ]
-        for gen_sug in generic_suggestions:
-            if gen_sug not in matched_queries:
-                matched_queries.append(gen_sug)
-                if len(matched_queries) >= max_suggestions:
-                    break
+    # ⚠️ 重要: 汎用候補は追加しない
+    # 動画に実際に含まれる内容のみを表示し、無理に候補を増やさない
+    # マッチした候補が0個の場合は空のリストを返す
     
     # 最大数に制限
     return matched_queries[:max_suggestions]
@@ -1468,7 +1456,7 @@ def main():
     )
     
     st.title("🎬 Context Cut Pro")
-    st.subheader("AI動画自動切り抜き＆テロップ編集ツール")
+    st.subheader("切り抜き動画生成＆編集ツール")
     
     # セッションステートの初期化
     if 'video_path' not in st.session_state:
@@ -1772,7 +1760,7 @@ def main():
                 # 検索クエリ候補の自動生成と表示
                 if 'transcript_text' in st.session_state and st.session_state.transcript_text:
                     if 'search_suggestions' not in st.session_state:
-                        # 文字起こしから検索クエリ候補を生成
+                        # 文字起こしから検索クエリ候補を生成（動画に含まれる内容のみ）
                         st.session_state.search_suggestions = generate_search_suggestions(
                             st.session_state.transcript_text
                         )
@@ -1794,6 +1782,10 @@ def main():
                                     st.session_state.selected_suggestion = suggestion
                                     st.rerun()
                         
+                        st.markdown("---")
+                    else:
+                        # 候補が生成できない場合の警告メッセージ
+                        st.info("ℹ️ この動画には、検索クエリを生成するのに十分な量の情報が含まれていません。\n\n💡 手動で検索キーワードを入力してください。")
                         st.markdown("---")
                 
                 n_results = st.slider("検索結果数", 1, 10, 5)
@@ -1858,16 +1850,22 @@ def main():
                                     st.session_state.clip_end = scene['end']  # 動画編集用
                                     st.session_state.scene_selected = True
                                     st.session_state.show_edit_guidance = True  # 動画編集タブで案内を表示
+                                    st.session_state.switch_to_edit_tab = True  # タブ切り替えフラグ
                                     st.success(f"✅ シーンを選択しました！")
-                                    st.info("💡 下の「🎬 動画編集」タブをクリックして編集を開始してください")
                                     st.rerun()
         
         # タブ2: 動画編集
         with tab2:
             st.header("🎬 動画編集")
             
+            # タブ切り替え案内メッセージ（目立つように）
+            if st.session_state.get('switch_to_edit_tab', False):
+                st.balloons()  # アニメーション効果
+                st.success("✅ シーンを選択しました！ここで編集を開始できます。")
+                st.session_state.switch_to_edit_tab = False
+            
             # シーン選択後の案内メッセージ
-            if st.session_state.get('show_edit_guidance', False):
+            elif st.session_state.get('show_edit_guidance', False):
                 st.success("✅ シーンが選択されました！このタブで編集を開始できます。")
                 st.session_state.show_edit_guidance = False
             
@@ -2083,9 +2081,18 @@ def main():
                                         st.write("**📐 位置設定**")
                                         col_x, col_y = st.columns(2)
                                         with col_x:
-                                            new_x = st.number_input("X位置", min_value=0, max_value=2000, value=int(layer['x']), step=10, key=f"layer_sticker_x_{i}")
+                                            # 文字列や浮動小数点数を安全に整数に変換
+                                            try:
+                                                current_x = int(float(layer.get('x', 0)))
+                                            except (ValueError, TypeError):
+                                                current_x = 0
+                                            new_x = st.number_input("X位置", min_value=0, max_value=2000, value=current_x, step=10, key=f"layer_sticker_x_{i}")
                                         with col_y:
-                                            new_y = st.number_input("Y位置", min_value=0, max_value=2000, value=int(layer['y']), step=10, key=f"layer_sticker_y_{i}")
+                                            try:
+                                                current_y = int(float(layer.get('y', 0)))
+                                            except (ValueError, TypeError):
+                                                current_y = 0
+                                            new_y = st.number_input("Y位置", min_value=0, max_value=2000, value=current_y, step=10, key=f"layer_sticker_y_{i}")
                                         
                                         # スケールの編集
                                         new_scale = st.slider("スケール（%）", min_value=10, max_value=300, value=int(layer.get('scale', 1.0) * 100), step=5, key=f"layer_sticker_scale_{i}") / 100.0
@@ -2114,8 +2121,8 @@ def main():
                                         # 変更があれば更新ボタンを表示
                                         changes_detected = (
                                             new_sticker_path != layer['path'] or
-                                            new_x != int(layer['x']) or
-                                            new_y != int(layer['y']) or
+                                            new_x != current_x or
+                                            new_y != current_y or
                                             new_scale != layer.get('scale', 1.0) or
                                             new_animation != layer.get('animation', 'none')
                                         )
@@ -2976,6 +2983,7 @@ def main():
                         st.session_state.scene_preview_dialog_open = False
                         st.session_state.scene_selected = True
                         st.session_state.show_edit_guidance = True  # 動画編集タブで案内を表示
+                        st.session_state.switch_to_edit_tab = True  # タブ切り替えフラグ
                         # スライダーの値をクリアして新しい値を反映させる
                         if 'cut_range_slider' in st.session_state:
                             del st.session_state.cut_range_slider
