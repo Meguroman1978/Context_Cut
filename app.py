@@ -1734,7 +1734,7 @@ def main():
     if st.session_state.video_path and st.session_state.transcription is not None:
         
         # タブUIの選択状態を管理
-        tab_names = ["🔍 シーン検索", "✂️ カット範囲指定", "💬 テロップ編集", "🎬 動画編集"]
+        tab_names = ["🔍 シーン検索", "🎬 動画編集"]
         
         # タブの選択を制御
         if 'force_tab_index' in st.session_state:
@@ -1743,7 +1743,7 @@ def main():
             st.session_state.active_tab = st.session_state.force_tab_index
             del st.session_state.force_tab_index
         
-        tab1, tab2, tab3, tab4 = st.tabs(tab_names)
+        tab1, tab2 = st.tabs(tab_names)
         
         # タブ1: シーン検索
         with tab1:
@@ -2665,605 +2665,122 @@ def main():
                     
                     st.markdown('</div>', unsafe_allow_html=True)
     
+        # ダイアログ関数定義（ifブロック内に配置）
+        @st.dialog("🎬 シーンプレビュー & 範囲調整", width="large")
+        def show_scene_preview_dialog():
+            # CSSでダイアログサイズを1/4に縮小
+            st.markdown("""
+                <style>
+                [data-testid="stDialog"] {
+                    max-width: 450px !important;
+                }
+                [data-testid="stDialog"] video {
+                    max-width: 100% !important;
+                    width: 300px !important;
+                    margin: 0 auto;
+                    display: block;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+            
+            if 'current_scene_preview_path' in st.session_state:
+                st.write(f"**シーン {st.session_state.preview_scene_id}**")
+                
+                if 'preview_scene_text' in st.session_state:
+                    st.info(f"💬 {st.session_state.preview_scene_text}")
+                
+                # 範囲調整スライダー
+                st.subheader("🎯 範囲調整")
+                
+                # 初期値を取得
+                if 'dialog_adjusted_start' not in st.session_state:
+                    st.session_state.dialog_adjusted_start = st.session_state.preview_scene_start
+                if 'dialog_adjusted_end' not in st.session_state:
+                    st.session_state.dialog_adjusted_end = st.session_state.preview_scene_end
+                
+                # 動画の全体長さを取得
+                video_duration = st.session_state.get('video_duration', 100.0)
+                
+                # 範囲調整スライダー
+                time_range = st.slider(
+                    "開始・終了時間を調整",
+                    0.0,
+                    video_duration,
+                    (st.session_state.dialog_adjusted_start, st.session_state.dialog_adjusted_end),
+                    step=0.1,
+                    key="dialog_time_slider"
+                )
+                
+                adjusted_start, adjusted_end = time_range
+                
+                # 調整後の時間を表示
+                col_time1, col_time2, col_time3 = st.columns(3)
+                with col_time1:
+                    st.metric("開始", f"{adjusted_start:.2f}秒")
+                with col_time2:
+                    st.metric("終了", f"{adjusted_end:.2f}秒")
+                with col_time3:
+                    st.metric("長さ", f"{adjusted_end - adjusted_start:.2f}秒")
+                
+                # 範囲が変更されたらプレビューを更新
+                if (adjusted_start != st.session_state.dialog_adjusted_start or 
+                    adjusted_end != st.session_state.dialog_adjusted_end):
+                    
+                    if st.button("🔄 この範囲でプレビューを更新", use_container_width=True):
+                        with st.spinner("プレビューを生成中..."):
+                            preview_path = str(TEMP_VIDEOS_DIR / f"scene_preview_{st.session_state.preview_scene_id}_adjusted.mp4")
+                            if create_preview_clip(
+                                st.session_state.video_path,
+                                adjusted_start,
+                                adjusted_end,
+                                preview_path
+                            ):
+                                st.session_state.current_scene_preview_path = preview_path
+                                st.session_state.dialog_adjusted_start = adjusted_start
+                                st.session_state.dialog_adjusted_end = adjusted_end
+                                st.rerun()
+                
+                # プレビュー動画を表示
+                st.subheader("📹 プレビュー")
+                st.video(st.session_state.current_scene_preview_path, loop=True)
+                
+                # ボタン
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✖️ 閉じる", use_container_width=True, key="close_dialog"):
+                        st.session_state.scene_preview_dialog_open = False
+                        # 調整値をリセット
+                        if 'dialog_adjusted_start' in st.session_state:
+                            del st.session_state.dialog_adjusted_start
+                        if 'dialog_adjusted_end' in st.session_state:
+                            del st.session_state.dialog_adjusted_end
+                        st.rerun()
+                with col2:
+                    if st.button("✅ この範囲で選択", use_container_width=True, key="select_from_dialog"):
+                        # 調整後の値を選択
+                        st.session_state.selected_start = st.session_state.dialog_adjusted_start
+                        st.session_state.selected_end = st.session_state.dialog_adjusted_end
+                        st.session_state.clip_start = st.session_state.dialog_adjusted_start  # 動画編集用
+                        st.session_state.clip_end = st.session_state.dialog_adjusted_end  # 動画編集用
+                        st.session_state.scene_preview_dialog_open = False
+                        st.session_state.scene_selected = True
+                        st.session_state.show_edit_guidance = True  # 動画編集タブで案内を表示
+                        # スライダーの値をクリアして新しい値を反映させる
+                        if 'cut_range_slider' in st.session_state:
+                            del st.session_state.cut_range_slider
+                        # 調整値をリセット
+                        if 'dialog_adjusted_start' in st.session_state:
+                            del st.session_state.dialog_adjusted_start
+                        if 'dialog_adjusted_end' in st.session_state:
+                            del st.session_state.dialog_adjusted_end
+                        st.rerun()
+        
+        # ダイアログを表示
+        if st.session_state.get('scene_preview_dialog_open', False):
+            show_scene_preview_dialog()
+    
     else:
         st.info("👈 サイドバーから動画を取得し、文字起こしを実行してください。")
-    
-        # タブ4: 動画編集
-        with tab4:
-            st.header("🎬 動画編集")
-            
-            # カット範囲が設定されているか確認
-            if 'clip_start' not in st.session_state or 'clip_end' not in st.session_state:
-                st.warning("⚠️ まず「✂️ カット範囲指定」でカット範囲を設定してください。")
-                st.info("💡 シーン検索で気に入ったシーンを選択するか、カット範囲指定でプレビューを生成してから、このタブで編集できます。")
-            else:
-                clip_duration = st.session_state.clip_end - st.session_state.clip_start
-                
-                # セッションステートの初期化
-                if 'pro_layers' not in st.session_state:
-                    st.session_state.pro_layers = []
-                if 'pro_effects' not in st.session_state:
-                    st.session_state.pro_effects = {
-                        'speed': 1.0,
-                        'brightness': 0.0,
-                        'contrast': 1.0,
-                        'saturation': 1.0
-                    }
-                if 'pro_audio' not in st.session_state:
-                    st.session_state.pro_audio = {
-                        'bgm_path': None,
-                        'bgm_volume': 0.5,
-                        'original_volume': 1.0,
-                        'bgm_start': 0.0,
-                        'bgm_end': clip_duration,
-                        'bgm_fade_in': 0.0,
-                        'bgm_fade_out': 0.0
-                    }
-                
-                # 2カラムレイアウト
-                col_main, col_preview = st.columns([2, 1])
-                
-                with col_main:
-                    # レイヤー一覧
-                    st.subheader("📚 レイヤー一覧")
-                    
-                    if not st.session_state.pro_layers and not st.session_state.pro_audio.get('bgm_path'):
-                        st.info("💡 まだレイヤーがありません。下のセクションからテキストやステッカーを追加してください。")
-                    else:
-                        # レイヤー情報の表示と編集
-                        for i, layer in enumerate(st.session_state.pro_layers):
-                            with st.expander(f"{'📝' if layer['type'] == 'text' else '🖼️'} レイヤー {i+1}: {layer['type'].upper()}", expanded=False):
-                                
-                                if layer['type'] == 'text':
-                                    # テキストレイヤーの編集
-                                    new_content = st.text_area("テキスト内容", layer['content'], height=80, key=f"edit_text_content_{i}")
-                                    
-                                    col1, col2 = st.columns(2)
-                                    with col1:
-                                        new_size = st.slider("フォントサイズ", 24, 120, layer['font_size'], key=f"edit_text_size_{i}")
-                                    with col2:
-                                        new_color = st.color_picker("文字色", layer['color'], key=f"edit_text_color_{i}")
-                                    
-                                    # 背景画像編集
-                                    st.write("**🖼️ 背景画像**")
-                                    bg_mode = st.radio(
-                                        "背景設定",
-                                        ["⛔ なし", "📚 プリセット", "📤 カスタム"],
-                                        index=0 if not layer.get('background_image') else 1,
-                                        key=f"edit_bg_mode_{i}",
-                                        horizontal=True
-                                    )
-                                    
-                                    new_bg_path = layer.get('background_image')
-                                    new_bg_opacity = layer.get('background_opacity', 1.0)
-                                    
-                                    if bg_mode == "📚 プリセット":
-                                        preset_bgs = list(TEXT_BACKGROUNDS_DIR.glob("*.png")) + list(TEXT_BACKGROUNDS_DIR.glob("*.jpg"))
-                                        if preset_bgs:
-                                            bg_names = ["なし"] + [bg.stem for bg in preset_bgs]
-                                            current_bg_name = Path(new_bg_path).stem if new_bg_path else "なし"
-                                            selected_bg = st.selectbox("背景を選択", bg_names, index=bg_names.index(current_bg_name) if current_bg_name in bg_names else 0, key=f"edit_bg_select_{i}")
-                                            if selected_bg != "なし":
-                                                new_bg_path = str([bg for bg in preset_bgs if bg.stem == selected_bg][0])
-                                            else:
-                                                new_bg_path = None
-                                    elif bg_mode == "⛔ なし":
-                                        new_bg_path = None
-                                    
-                                    if new_bg_path:
-                                        new_bg_opacity = st.slider("背景透明度", 0.0, 1.0, new_bg_opacity, 0.1, key=f"edit_bg_opacity_{i}")
-                                    
-                                    # 表示時間編集
-                                    st.write("**⏱️ 表示時間**")
-                                    time_range = st.slider(
-                                        "表示時間範囲",
-                                        0.0, clip_duration,
-                                        (layer['start'], layer['end']),
-                                        0.1,
-                                        key=f"edit_text_time_{i}"
-                                    )
-                                    
-                                    # 更新・削除ボタン
-                                    col_btn1, col_btn2 = st.columns(2)
-                                    with col_btn1:
-                                        if st.button("✅ 更新", key=f"update_text_{i}", use_container_width=True):
-                                            st.session_state.pro_layers[i].update({
-                                                'content': new_content,
-                                                'font_size': new_size,
-                                                'color': new_color,
-                                                'start': time_range[0],
-                                                'end': time_range[1],
-                                                'background_image': new_bg_path,
-                                                'background_opacity': new_bg_opacity
-                                            })
-                                            st.success("✅ 更新しました")
-                                            st.rerun()
-                                    with col_btn2:
-                                        if st.button("🗑️ 削除", key=f"delete_text_{i}", use_container_width=True):
-                                            st.session_state.pro_layers.pop(i)
-                                            st.success("削除しました")
-                                            st.rerun()
-                                
-                                elif layer['type'] == 'sticker':
-                                    # ステッカーレイヤーの編集
-                                    st.image(layer['path'], caption="現在のステッカー", width=150)
-                                    
-                                    # 新しいファイルアップロード
-                                    new_file = st.file_uploader("ステッカーを変更", type=['png', 'jpg', 'jpeg', 'gif'], key=f"edit_sticker_file_{i}")
-                                    new_path = layer['path']
-                                    if new_file:
-                                        new_path = str(TEMP_VIDEOS_DIR / f"sticker_updated_{i}_{new_file.name}")
-                                        with open(new_path, 'wb') as f:
-                                            f.write(new_file.getbuffer())
-                                        st.image(new_path, caption="新しいステッカー", width=150)
-                                    
-                                    # スケール調整
-                                    new_scale = st.slider("サイズ（%）", 10, 200, int(layer.get('scale', 1.0) * 100), 5, key=f"edit_sticker_scale_{i}") / 100.0
-                                    
-                                    # アニメーション選択
-                                    anim_options = ["none", "fade_in", "fade_out", "fade_in_out", "slide_in_left", "slide_in_right", "slide_in_top", "slide_in_bottom"]
-                                    anim_labels = ["なし", "フェードイン", "フェードアウト", "フェードイン&アウト", "左からスライド", "右からスライド", "上からスライド", "下からスライド"]
-                                    current_anim = layer.get('animation', 'none')
-                                    new_anim = st.selectbox(
-                                        "アニメーション",
-                                        anim_options,
-                                        index=anim_options.index(current_anim),
-                                        format_func=lambda x: anim_labels[anim_options.index(x)],
-                                        key=f"edit_sticker_anim_{i}"
-                                    )
-                                    
-                                    # 表示時間
-                                    st.write("**⏱️ 表示時間**")
-                                    time_range = st.slider(
-                                        "表示時間範囲",
-                                        0.0, clip_duration,
-                                        (layer['start'], layer['end']),
-                                        0.1,
-                                        key=f"edit_sticker_time_{i}"
-                                    )
-                                    
-                                    # 更新・削除ボタン
-                                    col_btn1, col_btn2 = st.columns(2)
-                                    with col_btn1:
-                                        if st.button("✅ 更新", key=f"update_sticker_{i}", use_container_width=True):
-                                            st.session_state.pro_layers[i].update({
-                                                'path': new_path,
-                                                'scale': new_scale,
-                                                'animation': new_anim,
-                                                'start': time_range[0],
-                                                'end': time_range[1]
-                                            })
-                                            st.success("✅ 更新しました")
-                                            st.rerun()
-                                    with col_btn2:
-                                        if st.button("🗑️ 削除", key=f"delete_sticker_{i}", use_container_width=True):
-                                            st.session_state.pro_layers.pop(i)
-                                            st.success("削除しました")
-                                            st.rerun()
-                        
-                        # BGM編集
-                        if st.session_state.pro_audio.get('bgm_path'):
-                            with st.expander("🎵 BGM設定", expanded=False):
-                                st.write(f"📁 現在のBGM: {Path(st.session_state.pro_audio['bgm_path']).name}")
-                                
-                                # BGM時間範囲
-                                st.write("**⏱️ BGM再生時間**")
-                                bgm_time = st.slider(
-                                    "BGM再生範囲（秒）",
-                                    0.0, clip_duration,
-                                    (st.session_state.pro_audio.get('bgm_start', 0.0), 
-                                     st.session_state.pro_audio.get('bgm_end', clip_duration)),
-                                    0.1,
-                                    key="edit_bgm_time"
-                                )
-                                
-                                # 音量調整
-                                col_vol1, col_vol2 = st.columns(2)
-                                with col_vol1:
-                                    bgm_vol = st.slider("BGM音量", 0.0, 1.0, st.session_state.pro_audio.get('bgm_volume', 0.5), 0.1, key="edit_bgm_vol")
-                                with col_vol2:
-                                    orig_vol = st.slider("元音声音量", 0.0, 1.0, st.session_state.pro_audio.get('original_volume', 1.0), 0.1, key="edit_orig_vol")
-                                
-                                # フェード効果
-                                st.write("**🎚️ フェード効果**")
-                                col_fade1, col_fade2 = st.columns(2)
-                                with col_fade1:
-                                    fade_in = st.slider("フェードイン（秒）", 0.0, 5.0, st.session_state.pro_audio.get('bgm_fade_in', 0.0), 0.1, key="edit_fade_in")
-                                with col_fade2:
-                                    fade_out = st.slider("フェードアウト（秒）", 0.0, 5.0, st.session_state.pro_audio.get('bgm_fade_out', 0.0), 0.1, key="edit_fade_out")
-                                
-                                # 更新・削除ボタン
-                                col_btn1, col_btn2 = st.columns(2)
-                                with col_btn1:
-                                    if st.button("✅ BGM設定を更新", use_container_width=True, key="update_bgm"):
-                                        st.session_state.pro_audio.update({
-                                            'bgm_start': bgm_time[0],
-                                            'bgm_end': bgm_time[1],
-                                            'bgm_volume': bgm_vol,
-                                            'original_volume': orig_vol,
-                                            'bgm_fade_in': fade_in,
-                                            'bgm_fade_out': fade_out
-                                        })
-                                        st.success("✅ 更新しました")
-                                        st.rerun()
-                                with col_btn2:
-                                    if st.button("🗑️ BGMを削除", use_container_width=True, key="delete_bgm"):
-                                        st.session_state.pro_audio['bgm_path'] = None
-                                        st.success("BGMを削除しました")
-                                        st.rerun()
-                    
-                    st.markdown("---")
-                    
-                    # レイヤー追加セクション
-                    st.subheader("➕ レイヤーを追加")
-                    
-                    add_type = st.selectbox("追加するレイヤー", ["📝 テキスト", "🖼️ ステッカー/画像", "🎵 BGM"], key="add_layer_type")
-                    
-                    if add_type == "📝 テキスト":
-                        with st.expander("📝 テキストレイヤーを追加", expanded=True):
-                            text_content = st.text_area("テキスト内容", "ここにテキストを入力", height=80, key="add_text_content")
-                            
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                text_size = st.slider("フォントサイズ", 24, 120, 48, key="add_text_size")
-                            with col2:
-                                text_color = st.color_picker("文字色", "#FFFFFF", key="add_text_color")
-                            
-                            # フォント選択
-                            japanese_fonts = get_japanese_fonts_dict()
-                            if japanese_fonts:
-                                selected_font_name = st.selectbox("フォント", list(japanese_fonts.keys()), key="add_text_font")
-                                selected_font_file = japanese_fonts[selected_font_name]
-                            else:
-                                selected_font_file = "Noto_Sans_JP.ttf"
-                            
-                            # 表示時間
-                            time_range = st.slider("表示時間範囲（秒）", 0.0, clip_duration, (0.0, min(3.0, clip_duration)), 0.1, key="add_text_time")
-                            
-                            # 位置
-                            position = st.selectbox("位置", ["下部中央", "上部中央", "中央", "左上", "右上", "左下", "右下"], key="add_text_pos")
-                            position_map = {
-                                "下部中央": ("(w-text_w)/2", "h-text_h-50"),
-                                "上部中央": ("(w-text_w)/2", "50"),
-                                "中央": ("(w-text_w)/2", "(h-text_h)/2"),
-                                "左上": ("50", "50"),
-                                "右上": ("w-text_w-50", "50"),
-                                "左下": ("50", "h-text_h-50"),
-                                "右下": ("w-text_w-50", "h-text_h-50")
-                            }
-                            x, y = position_map[position]
-                            
-                            if st.button("➕ テキストを追加", type="primary", use_container_width=True, key="btn_add_text"):
-                                new_layer = {
-                                    'type': 'text',
-                                    'content': text_content,
-                                    'start': time_range[0],
-                                    'end': time_range[1],
-                                    'x': x,
-                                    'y': y,
-                                    'font_size': text_size,
-                                    'color': text_color,
-                                    'font_file': selected_font_file,
-                                    'animation': 'none',
-                                    'background_image': None,
-                                    'background_opacity': 1.0,
-                                    'is_preset_position': True
-                                }
-                                st.session_state.pro_layers.append(new_layer)
-                                st.success("✅ テキストレイヤーを追加しました")
-                                st.rerun()
-                    
-                    elif add_type == "🖼️ ステッカー/画像":
-                        with st.expander("🖼️ ステッカー/画像を追加", expanded=True):
-                            sticker_file = st.file_uploader("画像をアップロード", type=['png', 'jpg', 'jpeg', 'gif'], key="add_sticker_file")
-                            
-                            if sticker_file:
-                                sticker_path = TEMP_VIDEOS_DIR / f"sticker_{len(st.session_state.pro_layers)}_{sticker_file.name}"
-                                with open(sticker_path, 'wb') as f:
-                                    f.write(sticker_file.getbuffer())
-                                
-                                st.image(sticker_path, caption="アップロードした画像", width=200)
-                                
-                                # 表示時間
-                                time_range = st.slider("表示時間範囲（秒）", 0.0, clip_duration, (0.0, min(3.0, clip_duration)), 0.1, key="add_sticker_time")
-                                
-                                # 位置
-                                position = st.selectbox("位置", ["下部中央", "上部中央", "中央", "左上", "右上", "左下", "右下"], key="add_sticker_pos")
-                                position_map = {
-                                    "下部中央": ("(main_w-overlay_w)/2", "main_h-overlay_h-50"),
-                                    "上部中央": ("(main_w-overlay_w)/2", "50"),
-                                    "中央": ("(main_w-overlay_w)/2", "(main_h-overlay_h)/2"),
-                                    "左上": ("50", "50"),
-                                    "右上": ("main_w-overlay_w-50", "50"),
-                                    "左下": ("50", "main_h-overlay_h-50"),
-                                    "右下": ("main_w-overlay_w-50", "main_h-overlay_h-50")
-                                }
-                                x, y = position_map[position]
-                                
-                                # スケール
-                                scale = st.slider("サイズ（%）", 10, 200, 100, 5, key="add_sticker_scale") / 100.0
-                                
-                                if st.button("➕ ステッカーを追加", type="primary", use_container_width=True, key="btn_add_sticker"):
-                                    new_layer = {
-                                        'type': 'sticker',
-                                        'path': str(sticker_path),
-                                        'start': time_range[0],
-                                        'end': time_range[1],
-                                        'x': x,
-                                        'y': y,
-                                        'scale': scale,
-                                        'animation': 'none'
-                                    }
-                                    st.session_state.pro_layers.append(new_layer)
-                                    st.success("✅ ステッカーを追加しました")
-                                    st.rerun()
-                    
-                    elif add_type == "🎵 BGM":
-                        with st.expander("🎵 BGMを追加", expanded=True):
-                            bgm_file = st.file_uploader("BGM音楽ファイル（MP3, WAV）", type=['mp3', 'wav'], key="add_bgm_file")
-                            
-                            if bgm_file:
-                                bgm_path = TEMP_VIDEOS_DIR / f"bgm_{bgm_file.name}"
-                                with open(bgm_path, 'wb') as f:
-                                    f.write(bgm_file.getbuffer())
-                                
-                                st.audio(bgm_path)
-                                st.success(f"✅ {bgm_file.name} をアップロードしました")
-                                
-                                # BGM時間範囲
-                                time_range = st.slider("BGM再生範囲（秒）", 0.0, clip_duration, (0.0, clip_duration), 0.1, key="add_bgm_time")
-                                
-                                # 音量
-                                col_vol1, col_vol2 = st.columns(2)
-                                with col_vol1:
-                                    bgm_vol = st.slider("BGM音量", 0.0, 1.0, 0.5, 0.1, key="add_bgm_vol")
-                                with col_vol2:
-                                    orig_vol = st.slider("元音声音量", 0.0, 1.0, 1.0, 0.1, key="add_orig_vol")
-                                
-                                if st.button("➕ BGMを追加", type="primary", use_container_width=True, key="btn_add_bgm"):
-                                    st.session_state.pro_audio.update({
-                                        'bgm_path': str(bgm_path),
-                                        'bgm_start': time_range[0],
-                                        'bgm_end': time_range[1],
-                                        'bgm_volume': bgm_vol,
-                                        'original_volume': orig_vol
-                                    })
-                                    st.success("✅ BGMを追加しました")
-                                    st.rerun()
-                    
-                    st.markdown("---")
-                    
-                    # エフェクトセクション
-                    st.subheader("⚡ エフェクト")
-                    
-                    with st.expander("⚡ 動画エフェクトを設定", expanded=False):
-                        st.write("**速度調整**")
-                        speed = st.slider(
-                            "再生速度",
-                            0.25, 4.0,
-                            st.session_state.pro_effects['speed'],
-                            0.25,
-                            key="effect_speed"
-                        )
-                        st.session_state.pro_effects['speed'] = speed
-                        
-                        st.markdown("---")
-                        st.write("**カラーフィルター**")
-                        
-                        brightness = st.slider(
-                            "明るさ",
-                            -1.0, 1.0,
-                            st.session_state.pro_effects['brightness'],
-                            0.1,
-                            key="effect_brightness"
-                        )
-                        st.session_state.pro_effects['brightness'] = brightness
-                        
-                        contrast = st.slider(
-                            "コントラスト",
-                            0.0, 3.0,
-                            st.session_state.pro_effects['contrast'],
-                            0.1,
-                            key="effect_contrast"
-                        )
-                        st.session_state.pro_effects['contrast'] = contrast
-                        
-                        saturation = st.slider(
-                            "彩度",
-                            0.0, 3.0,
-                            st.session_state.pro_effects['saturation'],
-                            0.1,
-                            key="effect_saturation"
-                        )
-                        st.session_state.pro_effects['saturation'] = saturation
-                        
-                        st.markdown("---")
-                        st.write("**クイックプリセット**")
-                        
-                        col_p1, col_p2, col_p3 = st.columns(3)
-                        with col_p1:
-                            if st.button("🌅 ヴィンテージ", key="preset_vintage"):
-                                st.session_state.pro_effects['brightness'] = -0.1
-                                st.session_state.pro_effects['contrast'] = 1.2
-                                st.session_state.pro_effects['saturation'] = 0.7
-                                st.rerun()
-                        with col_p2:
-                            if st.button("🌈 ビビッド", key="preset_vivid"):
-                                st.session_state.pro_effects['brightness'] = 0.1
-                                st.session_state.pro_effects['contrast'] = 1.3
-                                st.session_state.pro_effects['saturation'] = 1.5
-                                st.rerun()
-                        with col_p3:
-                            if st.button("🌑 モノクロ", key="preset_mono"):
-                                st.session_state.pro_effects['saturation'] = 0.0
-                                st.rerun()
-                        
-                        if st.button("🔄 エフェクトをリセット", key="reset_effects"):
-                            st.session_state.pro_effects = {
-                                'speed': 1.0,
-                                'brightness': 0.0,
-                                'contrast': 1.0,
-                                'saturation': 1.0
-                            }
-                            st.rerun()
-                    
-                    st.markdown("---")
-                    
-                    # プレビュー生成ボタン
-                    st.subheader("🎬 プレビュー")
-                    
-                    if st.button("🔄 プレビューを生成", type="primary", use_container_width=True, key="generate_preview"):
-                        with st.spinner("🎬 プレビューを生成中... (数分かかる場合があります)"):
-                            output_path = str(TEMP_VIDEOS_DIR / "pro_preview.mp4")
-                            
-                            success = generate_professional_video(
-                                st.session_state.video_path,
-                                st.session_state.clip_start,
-                                st.session_state.clip_end,
-                                output_path,
-                                st.session_state.pro_layers,
-                                st.session_state.pro_effects,
-                                st.session_state.pro_audio
-                            )
-                            
-                            if success:
-                                st.session_state.pro_preview_path = output_path
-                                st.success("✅ プレビューを生成しました！")
-                                st.rerun()
-                            else:
-                                st.error("❌ プレビュー生成に失敗しました")
-                
-                with col_preview:
-                    st.subheader("📹 プレビュー")
-                    
-                    if 'pro_preview_path' in st.session_state and Path(st.session_state.pro_preview_path).exists():
-                        st.video(st.session_state.pro_preview_path)
-                        
-                        # ダウンロードボタン
-                        with open(st.session_state.pro_preview_path, 'rb') as f:
-                            st.download_button(
-                                label="💾 動画をダウンロード",
-                                data=f,
-                                file_name="edited_video.mp4",
-                                mime="video/mp4",
-                                use_container_width=True
-                            )
-                    else:
-                        st.info("💡 「プレビューを生成」ボタンをクリックして動画を作成してください")
-    
-    # シーンプレビューのダイアログ（ポップアップ）
-    @st.dialog("🎬 シーンプレビュー & 範囲調整", width="large")
-    def show_scene_preview_dialog():
-        # CSSでダイアログサイズを1/4に縮小
-        st.markdown("""
-            <style>
-            [data-testid="stDialog"] {
-                max-width: 450px !important;
-            }
-            [data-testid="stDialog"] video {
-                max-width: 100% !important;
-                width: 300px !important;
-                margin: 0 auto;
-                display: block;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-        
-        if 'current_scene_preview_path' in st.session_state:
-            st.write(f"**シーン {st.session_state.preview_scene_id}**")
-            
-            if 'preview_scene_text' in st.session_state:
-                st.info(f"💬 {st.session_state.preview_scene_text}")
-            
-            # 範囲調整スライダー
-            st.subheader("🎯 範囲調整")
-            
-            # 初期値を取得
-            if 'dialog_adjusted_start' not in st.session_state:
-                st.session_state.dialog_adjusted_start = st.session_state.preview_scene_start
-            if 'dialog_adjusted_end' not in st.session_state:
-                st.session_state.dialog_adjusted_end = st.session_state.preview_scene_end
-            
-            # 動画の全体長さを取得
-            video_duration = st.session_state.get('video_duration', 100.0)
-            
-            # 範囲調整スライダー
-            time_range = st.slider(
-                "開始・終了時間を調整",
-                0.0,
-                video_duration,
-                (st.session_state.dialog_adjusted_start, st.session_state.dialog_adjusted_end),
-                step=0.1,
-                key="dialog_time_slider"
-            )
-            
-            adjusted_start, adjusted_end = time_range
-            
-            # 調整後の時間を表示
-            col_time1, col_time2, col_time3 = st.columns(3)
-            with col_time1:
-                st.metric("開始", f"{adjusted_start:.2f}秒")
-            with col_time2:
-                st.metric("終了", f"{adjusted_end:.2f}秒")
-            with col_time3:
-                st.metric("長さ", f"{adjusted_end - adjusted_start:.2f}秒")
-            
-            # 範囲が変更されたらプレビューを更新
-            if (adjusted_start != st.session_state.dialog_adjusted_start or 
-                adjusted_end != st.session_state.dialog_adjusted_end):
-                
-                if st.button("🔄 この範囲でプレビューを更新", use_container_width=True):
-                    with st.spinner("プレビューを生成中..."):
-                        preview_path = str(TEMP_VIDEOS_DIR / f"scene_preview_{st.session_state.preview_scene_id}_adjusted.mp4")
-                        if create_preview_clip(
-                            st.session_state.video_path,
-                            adjusted_start,
-                            adjusted_end,
-                            preview_path
-                        ):
-                            st.session_state.current_scene_preview_path = preview_path
-                            st.session_state.dialog_adjusted_start = adjusted_start
-                            st.session_state.dialog_adjusted_end = adjusted_end
-                            st.rerun()
-            
-            # プレビュー動画を表示
-            st.subheader("📹 プレビュー")
-            st.video(st.session_state.current_scene_preview_path, loop=True)
-            
-            # ボタン
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("✖️ 閉じる", use_container_width=True, key="close_dialog"):
-                    st.session_state.scene_preview_dialog_open = False
-                    # 調整値をリセット
-                    if 'dialog_adjusted_start' in st.session_state:
-                        del st.session_state.dialog_adjusted_start
-                    if 'dialog_adjusted_end' in st.session_state:
-                        del st.session_state.dialog_adjusted_end
-                    st.rerun()
-            with col2:
-                if st.button("✅ この範囲で選択", use_container_width=True, key="select_from_dialog"):
-                    # 調整後の値を選択
-                    st.session_state.selected_start = st.session_state.dialog_adjusted_start
-                    st.session_state.selected_end = st.session_state.dialog_adjusted_end
-                    st.session_state.clip_start = st.session_state.dialog_adjusted_start  # 動画編集用
-                    st.session_state.clip_end = st.session_state.dialog_adjusted_end  # 動画編集用
-                    st.session_state.scene_preview_dialog_open = False
-                    st.session_state.scene_selected = True
-                    st.session_state.show_edit_guidance = True  # 動画編集タブで案内を表示
-                    # スライダーの値をクリアして新しい値を反映させる
-                    if 'cut_range_slider' in st.session_state:
-                        del st.session_state.cut_range_slider
-                    # 調整値をリセット
-                    if 'dialog_adjusted_start' in st.session_state:
-                        del st.session_state.dialog_adjusted_start
-                    if 'dialog_adjusted_end' in st.session_state:
-                        del st.session_state.dialog_adjusted_end
-                    st.rerun()
-    
-    # ダイアログを表示
-    if st.session_state.get('scene_preview_dialog_open', False):
-        show_scene_preview_dialog()
     
     # フッター
     st.markdown("---")
