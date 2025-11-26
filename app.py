@@ -716,6 +716,222 @@ def transcribe_video(video_path: str, model) -> Optional[Dict]:
         return None
 
 
+def extract_text_from_video_frames(video_path: str, use_easyocr: bool = True) -> List[Dict]:
+    """動画フレームからOCRでテキストを抽出
+    
+    Args:
+        video_path: 動画ファイルのパス
+        use_easyocr: EasyOCRを使用する（日本語対応が良い）
+        
+    Returns:
+        抽出されたテキストとタイムスタンプのリスト
+        [{"text": "抽出テキスト", "timestamp": 10.5, "confidence": 0.95}, ...]
+    """
+    try:
+        import cv2
+        import numpy as np
+        
+        # EasyOCRまたはTesseractを選択
+        if use_easyocr:
+            try:
+                import easyocr
+                st.info("🔄 EasyOCR (日本語対応) を初期化中...")
+                reader = easyocr.Reader(['ja', 'en'], gpu=False)
+                st.success("✅ EasyOCR初期化完了")
+            except Exception as e:
+                st.warning(f"EasyOCRの初期化に失敗: {e}")
+                st.info("Tesseractにフォールバック...")
+                use_easyocr = False
+        
+        if not use_easyocr:
+            try:
+                import pytesseract
+                # Tesseractの設定（日本語対応）
+                tesseract_config = '--oem 3 --psm 6 -l jpn+eng'
+            except Exception as e:
+                st.error(f"OCRライブラリが利用できません: {e}")
+                return []
+        
+        # 動画を開く
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            st.error("動画を開けませんでした")
+            return []
+        
+        # 動画情報を取得
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        duration = total_frames / fps if fps > 0 else 0
+        
+        st.info(f"📹 動画情報: {duration:.1f}秒, {fps:.1f}fps, {total_frames}フレーム")
+        
+        # サンプリング間隔（1秒ごとにフレームを抽出）
+        sample_interval = max(1, int(fps))
+        
+        ocr_results = []
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        frame_count = 0
+        processed_count = 0
+        last_text = ""  # 重複テキストを避ける
+        
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            # サンプリング間隔ごとに処理
+            if frame_count % sample_interval == 0:
+                timestamp = frame_count / fps
+                
+                # 進捗表示
+                progress = int((frame_count / total_frames) * 100)
+                progress_bar.progress(progress)
+                status_text.text(f"🔍 OCR処理中... {timestamp:.1f}秒 / {duration:.1f}秒")
+                
+                # 前処理: グレースケール化とコントラスト強調
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                # アダプティブしきい値処理
+                processed = cv2.adaptiveThreshold(
+                    gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                    cv2.THRESH_BINARY, 11, 2
+                )
+                
+                # OCR実行
+                try:
+                    if use_easyocr:
+                        # EasyOCRで読み取り
+                        results = reader.readtext(processed)
+                        for (bbox, text, confidence) in results:
+                            # 信頼度が低いものは除外
+                            if confidence > 0.5 and text.strip() and text != last_text:
+                                ocr_results.append({
+                                    "text": text.strip(),
+                                    "timestamp": timestamp,
+                                    "confidence": confidence
+                                })
+                                last_text = text
+                    else:
+                        # Tesseractで読み取り
+                        text = pytesseract.image_to_string(processed, config=tesseract_config)
+                        text = text.strip()
+                        if text and text != last_text:
+                            ocr_results.append({
+                                "text": text,
+                                "timestamp": timestamp,
+                                "confidence": 0.8  # Tesseractは信頼度を返さない
+                            })
+                            last_text = text
+                except Exception as e:
+                    # OCRエラーはスキップ
+                    pass
+                
+                processed_count += 1
+            
+            frame_count += 1
+        
+        cap.release()
+        progress_bar.empty()
+        status_text.empty()
+        
+        # 結果をまとめる
+        if ocr_results:
+            st.success(f"✅ OCR完了: {len(ocr_results)}個のテキストを抽出しました")
+            # 最初の数件をプレビュー表示
+            st.write("**抽出されたテキストのサンプル:**")
+            for i, result in enumerate(ocr_results[:5]):
+                st.caption(f"{result['timestamp']:.1f}秒: {result['text'][:50]}...")
+        else:
+            st.warning("⚠️ 動画内からテキストが検出されませんでした")
+        
+        return ocr_results
+        
+    except Exception as e:
+        st.error(f"OCR処理中にエラーが発生しました: {e}")
+        return []
+
+
+def combine_transcription_and_ocr(transcription: Dict, ocr_results: List[Dict]) -> Dict:
+    """音声文字起こしとOCRテキストを統合
+    
+    Args:
+        transcription: Whisperの文字起こし結果
+        ocr_results: OCRで抽出したテキスト
+        
+    Returns:
+        統合された文字起こしデータ
+    """
+    if not ocr_results:
+        return transcription
+    
+    try:
+        # 元のセグメントをコピー
+        combined = transcription.copy()
+        segments = combined.get('segments', [])
+        
+        # OCRテキストを近い時刻のセグメントに追加
+        for ocr_item in ocr_results:
+            ocr_text = ocr_item['text']
+            ocr_time = ocr_item['timestamp']
+            
+            # 最も近いセグメントを見つける
+            closest_segment = None
+            min_time_diff = float('inf')
+            
+            for segment in segments:
+                seg_start = segment['start']
+                seg_end = segment['end']
+                
+                # セグメント内または近接している場合
+                if seg_start <= ocr_time <= seg_end:
+                    closest_segment = segment
+                    break
+                
+                # 時間差を計算
+                time_diff = min(abs(ocr_time - seg_start), abs(ocr_time - seg_end))
+                if time_diff < min_time_diff:
+                    min_time_diff = time_diff
+                    closest_segment = segment
+            
+            # 3秒以内のセグメントに追加
+            if closest_segment and min_time_diff < 3.0:
+                # OCRテキストを追加（重複チェック）
+                if 'ocr_text' not in closest_segment:
+                    closest_segment['ocr_text'] = []
+                if ocr_text not in closest_segment['ocr_text']:
+                    closest_segment['ocr_text'].append(ocr_text)
+            else:
+                # 新しいセグメントとして追加
+                new_segment = {
+                    'start': ocr_time,
+                    'end': ocr_time + 1.0,
+                    'text': '',  # 音声テキストは空
+                    'ocr_text': [ocr_text]
+                }
+                segments.append(new_segment)
+        
+        # セグメントを時刻順にソート
+        segments.sort(key=lambda x: x['start'])
+        combined['segments'] = segments
+        
+        # 全テキストを更新（音声 + OCR）
+        all_texts = []
+        for segment in segments:
+            if segment.get('text'):
+                all_texts.append(segment['text'])
+            if segment.get('ocr_text'):
+                all_texts.extend(segment['ocr_text'])
+        
+        combined['text'] = ' '.join(all_texts)
+        
+        return combined
+        
+    except Exception as e:
+        st.warning(f"文字起こしとOCRの統合に失敗: {e}")
+        return transcription
+
+
 def setup_chromadb() -> chromadb.Client:
     """ChromaDBクライアントをセットアップ"""
     try:
@@ -752,13 +968,25 @@ def index_transcription_to_chromadb(transcription: Dict, video_name: str, client
         ids = []
         
         for i, segment in enumerate(transcription['segments']):
+            # 音声テキスト
             text = segment['text'].strip()
-            if text:
-                documents.append(text)
+            
+            # OCRテキストがあれば結合
+            ocr_texts = segment.get('ocr_text', [])
+            if ocr_texts:
+                combined_text = text + " " + " ".join(ocr_texts)
+                combined_text = combined_text.strip()
+            else:
+                combined_text = text
+            
+            if combined_text:
+                documents.append(combined_text)
                 metadatas.append({
                     'start': segment['start'],
                     'end': segment['end'],
-                    'segment_id': i
+                    'segment_id': i,
+                    'has_ocr': len(ocr_texts) > 0,
+                    'ocr_count': len(ocr_texts)
                 })
                 ids.append(f"segment_{i}")
         
@@ -769,7 +997,12 @@ def index_transcription_to_chromadb(transcription: Dict, video_name: str, client
                 ids=ids
             )
             
-            st.success(f"✅ {len(documents)}件のセグメントをインデックス化しました!")
+            # OCR統計を表示
+            ocr_segments = sum(1 for meta in metadatas if meta.get('has_ocr', False))
+            if ocr_segments > 0:
+                st.success(f"✅ {len(documents)}件のセグメントをインデックス化しました（うち{ocr_segments}件にOCRテキスト含む）")
+            else:
+                st.success(f"✅ {len(documents)}件のセグメントをインデックス化しました!")
             return collection_name
         else:
             st.warning("インデックス化可能なテキストが見つかりませんでした。")
@@ -1836,8 +2069,29 @@ def main():
         if st.session_state.video_path:
             st.info("💡 シーン検索機能を使用する場合は文字起こしが必要です。\n文字起こしなしでも、カット範囲指定とテロップ編集は使用できます。")
             
+            # OCRオプション
+            st.write("**📝 テキスト抽出オプション**")
+            enable_ocr = st.checkbox(
+                "🔍 動画内のテキストもOCRで抽出（字幕、テロップなど）",
+                value=False,
+                help="有効にすると、音声だけでなく動画内に表示されるテキストも検索対象になります。処理時間が増加します。"
+            )
+            
+            if enable_ocr:
+                st.info("✨ OCRを有効にすると、動画内の字幕・テロップ・スライド文字なども検索できます")
+                ocr_method = st.radio(
+                    "OCR方式を選択",
+                    ["🌟 EasyOCR（推奨・日本語精度が高い）", "⚡ Tesseract（高速）"],
+                    index=0,
+                    horizontal=True,
+                    help="EasyOCRは日本語の認識精度が高いですが、初回は数分かかります。"
+                )
+                use_easyocr = "EasyOCR" in ocr_method
+            else:
+                use_easyocr = True  # デフォルト
+            
             # モデル選択オプション
-            st.write("**Whisperモデル選択**")
+            st.write("**🎤 Whisper音声認識モデル**")
             model_choice = st.radio(
                 "処理速度と精度のバランスを選択",
                 ["🚀 高速（tiny）- 推奨", "⚖️ バランス（base）", "🎯 高精度（small）"],
@@ -1857,10 +2111,24 @@ def main():
             col_trans1, col_trans2 = st.columns(2)
             with col_trans1:
                 if st.button("🎤 文字起こしを実行", use_container_width=True):
+                    # 音声文字起こし
                     model = load_whisper_model(model_name)
                     if model:
                         transcription = transcribe_video(st.session_state.video_path, model)
                         if transcription:
+                            # OCR処理を実行（有効な場合）
+                            if enable_ocr:
+                                st.info("🔄 OCR処理を開始します...")
+                                ocr_results = extract_text_from_video_frames(
+                                    st.session_state.video_path, 
+                                    use_easyocr=use_easyocr
+                                )
+                                
+                                # 音声とOCRを統合
+                                if ocr_results:
+                                    transcription = combine_transcription_and_ocr(transcription, ocr_results)
+                                    st.success(f"✅ OCRテキストを統合しました（{len(ocr_results)}件）")
+                            
                             st.session_state.transcription = transcription
                             st.session_state.video_duration = get_video_duration(st.session_state.video_path)
                             
