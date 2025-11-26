@@ -387,96 +387,175 @@ def download_from_google_drive(file_id: str, output_path: str) -> bool:
 
 def download_from_web(url: str, output_path: str) -> bool:
     """Web URLから動画をダウンロード（yt-dlp使用）"""
-    try:
-        # 出力パスから拡張子を除去（yt-dlpが自動的に付与）
-        output_template = str(Path(output_path).with_suffix(''))
-        
-        ydl_opts = {
-            # フォーマット選択: 720p以下のMP4を優先、なければベスト品質
+    
+    # 出力パスから拡張子を除去（yt-dlpが自動的に付与）
+    output_template = str(Path(output_path).with_suffix(''))
+    
+    # 複数の設定を試す戦略
+    strategies = [
+        {
+            'name': '標準設定（高画質）',
             'format': 'bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best',
-            'outtmpl': output_template,
-            'merge_output_format': 'mp4',
-            'quiet': False,
-            'no_warnings': False,
-            # エラー回避設定
-            'nocheckcertificate': True,
-            'ignoreerrors': False,
-            'no_color': True,
-            # Cookie・認証関連
-            'cookiefile': None,
-            'username': None,
-            'password': None,
-            # 追加のヘッダー設定
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-us,en;q=0.5',
-                'Sec-Fetch-Mode': 'navigate',
-            },
-            # プログレス表示
-            'progress_hooks': [],
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],
+                    'player_skip': ['webpage', 'configs'],
+                }
+            }
+        },
+        {
+            'name': '低画質設定（360p）',
+            'format': 'bestvideo[ext=mp4][height<=360]+bestaudio[ext=m4a]/best[ext=mp4][height<=360]/worst',
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android'],
+                }
+            }
+        },
+        {
+            'name': 'モバイル設定',
+            'format': 'best[ext=mp4]/best',
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'ios'],
+                }
+            }
+        },
+        {
+            'name': '最低品質（フォールバック）',
+            'format': 'worst',
+            'extractor_args': {}
         }
-        
-        st.info(f"🔄 動画をダウンロード中... URL: {url}")
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # 動画情報を取得
-            info = ydl.extract_info(url, download=False)
-            video_title = info.get('title', 'Unknown')
-            duration = info.get('duration', 0)
-            st.info(f"📹 タイトル: {video_title}")
-            st.info(f"⏱️ 長さ: {duration//60}分{duration%60}秒")
+    ]
+    
+    for idx, strategy in enumerate(strategies):
+        try:
+            st.info(f"🔄 試行 {idx+1}/{len(strategies)}: {strategy['name']}")
             
-            # ダウンロード実行
-            ydl.download([url])
-        
-        # ダウンロードされたファイルを確認
-        possible_extensions = ['.mp4', '.webm', '.mkv', '.flv']
-        downloaded_file = None
-        
-        for ext in possible_extensions:
-            check_path = Path(output_template + ext)
-            if check_path.exists() and check_path.stat().st_size > 0:
-                downloaded_file = check_path
-                break
-        
-        if not downloaded_file:
-            st.error("❌ ダウンロードされたファイルが見つかりません")
-            return False
-        
-        # 出力パスにリネーム（必要に応じて）
-        if str(downloaded_file) != output_path:
-            import shutil
-            shutil.move(str(downloaded_file), output_path)
-        
-        # ファイルサイズを確認
-        file_size = Path(output_path).stat().st_size
-        if file_size == 0:
-            st.error("❌ ダウンロードされたファイルが空です")
-            return False
-        
-        st.success(f"✅ ダウンロード完了！ (ファイルサイズ: {file_size/1024/1024:.1f}MB)")
-        return True
-        
-    except yt_dlp.utils.DownloadError as e:
-        error_msg = str(e)
-        if "Sign in to confirm you're not a bot" in error_msg or "Sign in" in error_msg:
-            st.error("❌ YouTubeがボット検出を実施しています。")
-            st.info("💡 **対処法**:")
-            st.info("1. 数分待ってから再試行してください")
-            st.info("2. 別の動画URLを試してください")
-            st.info("3. YouTubeの短い動画（5分以内）を試してください")
-        elif "Private video" in error_msg:
-            st.error("❌ この動画は非公開です")
-        elif "Video unavailable" in error_msg:
-            st.error("❌ この動画は利用できません")
-        else:
-            st.error(f"❌ ダウンロードエラー: {error_msg}")
-        return False
-    except Exception as e:
-        st.error(f"❌ Web URLからのダウンロードに失敗しました: {e}")
-        st.info("💡 別の動画URLを試すか、ローカルファイルのアップロードをご利用ください")
-        return False
+            ydl_opts = {
+                'format': strategy['format'],
+                'outtmpl': output_template,
+                'merge_output_format': 'mp4',
+                'quiet': False,
+                'no_warnings': False,
+                # 403エラー対策の強化設定
+                'nocheckcertificate': True,
+                'ignoreerrors': False,
+                'no_color': True,
+                'extractor_args': strategy['extractor_args'],
+                # より強力なヘッダー設定
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+                    'Accept': '*/*',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Origin': 'https://www.youtube.com',
+                    'Referer': 'https://www.youtube.com/',
+                    'Sec-Fetch-Dest': 'empty',
+                    'Sec-Fetch-Mode': 'cors',
+                    'Sec-Fetch-Site': 'cross-site',
+                },
+                # YouTube特有の設定
+                'age_limit': None,
+                'geo_bypass': True,
+                'geo_bypass_country': 'US',
+                # リトライ設定
+                'retries': 3,
+                'fragment_retries': 3,
+                'skip_unavailable_fragments': True,
+            }
+            
+            if idx == 0:
+                st.info(f"📹 動画URL: {url}")
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                # 動画情報を取得
+                try:
+                    info = ydl.extract_info(url, download=False)
+                    video_title = info.get('title', 'Unknown')
+                    duration = info.get('duration', 0)
+                    if idx == 0:
+                        st.info(f"📺 タイトル: {video_title}")
+                        st.info(f"⏱️ 長さ: {duration//60}分{duration%60}秒")
+                except Exception as info_error:
+                    st.warning(f"動画情報の取得に失敗: {info_error}")
+                    # 情報取得失敗でもダウンロードは試みる
+                
+                # ダウンロード実行
+                ydl.download([url])
+            
+            # ダウンロードされたファイルを確認
+            possible_extensions = ['.mp4', '.webm', '.mkv', '.flv', '.3gp']
+            downloaded_file = None
+            
+            for ext in possible_extensions:
+                check_path = Path(output_template + ext)
+                if check_path.exists() and check_path.stat().st_size > 0:
+                    downloaded_file = check_path
+                    break
+            
+            if not downloaded_file:
+                if idx < len(strategies) - 1:
+                    st.warning(f"⚠️ {strategy['name']}では失敗しました。次の方法を試します...")
+                    continue
+                else:
+                    st.error("❌ ダウンロードされたファイルが見つかりません")
+                    return False
+            
+            # 出力パスにリネーム（必要に応じて）
+            if str(downloaded_file) != output_path:
+                import shutil
+                shutil.move(str(downloaded_file), output_path)
+            
+            # ファイルサイズを確認
+            file_size = Path(output_path).stat().st_size
+            if file_size == 0:
+                st.error("❌ ダウンロードされたファイルが空です")
+                return False
+            
+            st.success(f"✅ ダウンロード完了！ ({strategy['name']}, {file_size/1024/1024:.1f}MB)")
+            return True
+            
+        except yt_dlp.utils.DownloadError as e:
+            error_msg = str(e)
+            
+            # 最後の戦略でもエラーの場合のみ詳細表示
+            if idx >= len(strategies) - 1:
+                if "403" in error_msg or "Forbidden" in error_msg:
+                    st.error("❌ YouTubeがアクセスを拒否しています（403 Forbidden）")
+                    st.info("💡 **この動画は現在ダウンロードできません**:")
+                    st.info("1. YouTube側の制限により一時的にダウンロード不可")
+                    st.info("2. 地域制限がかかっている可能性があります")
+                    st.info("3. 別の動画URLを試してください")
+                    st.info("4. または、動画を手動でダウンロードしてローカルファイルとしてアップロードしてください")
+                elif "Sign in" in error_msg:
+                    st.error("❌ YouTubeがボット検出を実施しています")
+                    st.info("💡 数分待ってから再試行するか、別の動画を試してください")
+                elif "Private video" in error_msg:
+                    st.error("❌ この動画は非公開です")
+                elif "Video unavailable" in error_msg:
+                    st.error("❌ この動画は利用できません")
+                else:
+                    st.error(f"❌ ダウンロードエラー: {error_msg}")
+                return False
+            else:
+                # 次の戦略を試す
+                st.warning(f"⚠️ {strategy['name']}では失敗: {error_msg[:100]}...")
+                continue
+                
+        except Exception as e:
+            if idx >= len(strategies) - 1:
+                st.error(f"❌ Web URLからのダウンロードに失敗しました: {e}")
+                st.info("💡 **代替方法**:")
+                st.info("1. 別の動画URLを試してください")
+                st.info("2. ローカルファイルとしてアップロードしてください")
+                st.info("3. 動画を手動でダウンロード: https://youtube-dl.org/")
+                return False
+            else:
+                st.warning(f"⚠️ {strategy['name']}でエラー: {str(e)[:100]}...")
+                continue
+    
+    return False
 
 
 @st.cache_resource
@@ -2048,12 +2127,41 @@ def main():
                 st.info("📌 認証情報なしでも、「Web URL（YouTube等）」または「ローカルファイル」は利用できます。")
         
         elif video_source == "Web URL（YouTube等）":
-            web_url = st.text_input("動画URL")
+            st.info("💡 YouTubeの制限により、一部の動画はダウンロードできない場合があります")
+            
+            with st.expander("⚠️ ダウンロードできない場合の対処法", expanded=False):
+                st.markdown("""
+                **YouTubeダウンロードの制限について:**
+                
+                - 一部の動画は著作権保護やYouTube側の制限により直接ダウンロードできません
+                - 403 Forbiddenエラーが出る場合は、以下の代替方法をお試しください
+                
+                **代替方法 1: ローカルファイルとしてアップロード**
+                1. YouTubeから手動で動画をダウンロード
+                2. 「ローカルファイル」オプションを選択してアップロード
+                
+                **代替方法 2: 別の動画を試す**
+                - 短い動画（5分以内）
+                - 最近アップロードされた動画
+                - 一般公開されている動画
+                
+                **推奨ツール:**
+                - [4K Video Downloader](https://www.4kdownload.com/)
+                - [yt-dlp](https://github.com/yt-dlp/yt-dlp) (コマンドライン)
+                """)
+            
+            web_url = st.text_input("動画URL", placeholder="https://www.youtube.com/watch?v=...")
+            
             if st.button("ダウンロード"):
-                output_path = str(TEMP_VIDEOS_DIR / "video_web.mp4")
-                if download_from_web(web_url, output_path):
-                    st.session_state.video_path = output_path
-                    st.success("✅ ダウンロード完了!")
+                if not web_url:
+                    st.error("❌ URLを入力してください")
+                else:
+                    output_path = str(TEMP_VIDEOS_DIR / "video_web.mp4")
+                    if download_from_web(web_url, output_path):
+                        st.session_state.video_path = output_path
+                        st.success("✅ ダウンロード完了!")
+                    else:
+                        st.warning("💡 ダウンロードに失敗した場合は、上記の「代替方法」をご確認ください")
         
         elif video_source == "ローカルファイル":
             uploaded_file = st.file_uploader("動画ファイルをアップロード", type=['mp4', 'mov', 'avi', 'mkv'])
