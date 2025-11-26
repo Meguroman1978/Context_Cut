@@ -1,3 +1,4 @@
+# Core dependencies
 streamlit>=1.28.0
 openai-whisper>=20231117
 google-api-python-client>=2.100.0
@@ -13,6 +14,13 @@ requests>=2.31.0
 python-dotenv>=1.0.0
 pillow>=10.0.0
 streamlit-drawable-canvas>=0.9.3
+
+# OCR dependencies
 pytesseract>=0.3.10
 opencv-python-headless>=4.8.0
 easyocr>=1.7.0
+
+# Note: For optimal YouTube download performance, install aria2c system package:
+# Ubuntu/Debian: sudo apt-get install aria2
+# macOS: brew install aria2
+# Windows: Download from https://aria2.github.io/
