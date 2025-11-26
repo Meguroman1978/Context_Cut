@@ -1994,19 +1994,138 @@ def main():
                                 
                                 with col_l1:
                                     if layer['type'] == 'text':
-                                        st.text_area("内容", layer['content'], height=60, key=f"layer_content_{i}", disabled=True)
-                                        st.write(f"🎨 サイズ: {layer['font_size']}px, 色: {layer['color']}")
-                                        # 背景画像情報を表示
-                                        if layer.get('background_image'):
-                                            bg_name = Path(layer['background_image']).stem
-                                            st.write(f"🖼️ 背景: {bg_name} (透明度: {layer.get('background_opacity', 1.0)*100:.0f}%)")
-                                        else:
-                                            st.write("🖼️ 背景: なし")
+                                        # テキスト内容の編集
+                                        new_content = st.text_area("内容", layer['content'], height=60, key=f"layer_content_{i}")
+                                        
+                                        # サイズと色の編集
+                                        col_size, col_color = st.columns(2)
+                                        with col_size:
+                                            new_font_size = st.number_input("フォントサイズ", min_value=10, max_value=200, value=layer['font_size'], step=5, key=f"layer_font_size_{i}")
+                                        with col_color:
+                                            new_color = st.color_picker("テキスト色", value=layer['color'], key=f"layer_color_{i}")
+                                        
+                                        # 背景画像の編集
+                                        st.write("**🖼️ 背景画像設定**")
+                                        bg_mode = st.radio(
+                                            "背景画像",
+                                            ["なし", "プリセット", "カスタム"],
+                                            index=0 if not layer.get('background_image') else (1 if "text_backgrounds/" in layer.get('background_image', '') else 2),
+                                            key=f"layer_bg_mode_{i}",
+                                            horizontal=True
+                                        )
+                                        
+                                        new_bg_image = None
+                                        new_bg_size = layer.get('background_size', 1.2)
+                                        new_bg_opacity = layer.get('background_opacity', 1.0)
+                                        
+                                        if bg_mode == "プリセット":
+                                            bg_files = list(TEXT_BACKGROUNDS_DIR.glob("*.png")) + list(TEXT_BACKGROUNDS_DIR.glob("*.jpg"))
+                                            if bg_files:
+                                                bg_names = [f.stem for f in bg_files]
+                                                current_bg = Path(layer.get('background_image', '')).stem if layer.get('background_image') else None
+                                                default_idx = bg_names.index(current_bg) if current_bg in bg_names else 0
+                                                selected_bg = st.selectbox("背景を選択", bg_names, index=default_idx, key=f"layer_bg_preset_{i}")
+                                                new_bg_image = str([f for f in bg_files if f.stem == selected_bg][0])
+                                        elif bg_mode == "カスタム":
+                                            uploaded_bg = st.file_uploader("背景画像をアップロード", type=['png', 'jpg', 'jpeg'], key=f"layer_bg_upload_{i}")
+                                            if uploaded_bg:
+                                                bg_path = TEMP_IMAGES_DIR / f"text_bg_layer_{i}_{uploaded_bg.name}"
+                                                with open(bg_path, 'wb') as f:
+                                                    f.write(uploaded_bg.read())
+                                                new_bg_image = str(bg_path)
+                                            elif layer.get('background_image'):
+                                                new_bg_image = layer['background_image']
+                                        
+                                        if bg_mode != "なし":
+                                            new_bg_size = st.slider("背景サイズ", 0.5, 3.0, new_bg_size, 0.1, key=f"layer_bg_size_{i}")
+                                            new_bg_opacity = st.slider("背景透明度", 0.0, 1.0, new_bg_opacity, 0.05, key=f"layer_bg_opacity_{i}")
+                                        
+                                        # 変更があれば更新ボタンを表示
+                                        changes_detected = (
+                                            new_content != layer['content'] or
+                                            new_font_size != layer['font_size'] or
+                                            new_color != layer['color'] or
+                                            (bg_mode == "なし" and layer.get('background_image')) or
+                                            (bg_mode != "なし" and new_bg_image and new_bg_image != layer.get('background_image')) or
+                                            new_bg_size != layer.get('background_size', 1.2) or
+                                            new_bg_opacity != layer.get('background_opacity', 1.0)
+                                        )
+                                        
+                                        if changes_detected:
+                                            if st.button("💾 変更を保存", key=f"save_text_layer_{i}", type="primary"):
+                                                st.session_state.pro_layers[i]['content'] = new_content
+                                                st.session_state.pro_layers[i]['font_size'] = new_font_size
+                                                st.session_state.pro_layers[i]['color'] = new_color
+                                                if bg_mode == "なし":
+                                                    st.session_state.pro_layers[i]['background_image'] = None
+                                                else:
+                                                    st.session_state.pro_layers[i]['background_image'] = new_bg_image
+                                                    st.session_state.pro_layers[i]['background_size'] = new_bg_size
+                                                    st.session_state.pro_layers[i]['background_opacity'] = new_bg_opacity
+                                                st.success(f"✅ レイヤー{i+1}を更新しました")
+                                                st.rerun()
                                     elif layer['type'] == 'sticker':
-                                        st.write(f"📁 ファイル: {Path(layer['path']).name}")
-                                        st.write(f"📐 位置: X={layer['x']}, Y={layer['y']}")
-                                        if layer.get('scale', 1.0) != 1.0:
-                                            st.write(f"🔍 スケール: {layer['scale']*100:.0f}%")
+                                        # ファイルの再アップロード
+                                        st.write(f"📁 現在のファイル: {Path(layer['path']).name}")
+                                        new_sticker_file = st.file_uploader("新しいファイルに変更", type=['png', 'jpg', 'jpeg', 'gif'], key=f"layer_sticker_file_{i}")
+                                        
+                                        new_sticker_path = layer['path']
+                                        if new_sticker_file:
+                                            new_path = TEMP_IMAGES_DIR / f"layer_sticker_{i}_{new_sticker_file.name}"
+                                            with open(new_path, 'wb') as f:
+                                                f.write(new_sticker_file.read())
+                                            new_sticker_path = str(new_path)
+                                        
+                                        # 位置の編集
+                                        st.write("**📐 位置設定**")
+                                        col_x, col_y = st.columns(2)
+                                        with col_x:
+                                            new_x = st.number_input("X位置", min_value=0, max_value=2000, value=int(layer['x']), step=10, key=f"layer_sticker_x_{i}")
+                                        with col_y:
+                                            new_y = st.number_input("Y位置", min_value=0, max_value=2000, value=int(layer['y']), step=10, key=f"layer_sticker_y_{i}")
+                                        
+                                        # スケールの編集
+                                        new_scale = st.slider("スケール（%）", min_value=10, max_value=300, value=int(layer.get('scale', 1.0) * 100), step=5, key=f"layer_sticker_scale_{i}") / 100.0
+                                        
+                                        # アニメーションの編集
+                                        st.write("**✨ アニメーション**")
+                                        animation_options = {
+                                            'none': 'なし',
+                                            'fade_in': 'フェードイン',
+                                            'fade_out': 'フェードアウト',
+                                            'fade_in_out': 'フェードイン＆アウト',
+                                            'slide_in_left': '左からスライドイン',
+                                            'slide_in_right': '右からスライドイン',
+                                            'slide_in_top': '上からスライドイン',
+                                            'slide_in_bottom': '下からスライドイン'
+                                        }
+                                        current_anim = layer.get('animation', 'none')
+                                        new_animation = st.selectbox(
+                                            "アニメーション効果",
+                                            list(animation_options.keys()),
+                                            index=list(animation_options.keys()).index(current_anim),
+                                            format_func=lambda x: animation_options[x],
+                                            key=f"layer_sticker_anim_{i}"
+                                        )
+                                        
+                                        # 変更があれば更新ボタンを表示
+                                        changes_detected = (
+                                            new_sticker_path != layer['path'] or
+                                            new_x != int(layer['x']) or
+                                            new_y != int(layer['y']) or
+                                            new_scale != layer.get('scale', 1.0) or
+                                            new_animation != layer.get('animation', 'none')
+                                        )
+                                        
+                                        if changes_detected:
+                                            if st.button("💾 変更を保存", key=f"save_sticker_layer_{i}", type="primary"):
+                                                st.session_state.pro_layers[i]['path'] = new_sticker_path
+                                                st.session_state.pro_layers[i]['x'] = new_x
+                                                st.session_state.pro_layers[i]['y'] = new_y
+                                                st.session_state.pro_layers[i]['scale'] = new_scale
+                                                st.session_state.pro_layers[i]['animation'] = new_animation
+                                                st.success(f"✅ レイヤー{i+1}を更新しました")
+                                                st.rerun()
                                     
                                     # アニメーション情報を表示
                                     if anim != 'none':
@@ -2047,28 +2166,111 @@ def main():
                                         st.success("削除しました")
                                         st.rerun()
                         
-                        # BGMの詳細表示
+                        # BGMの詳細表示と編集
                         if st.session_state.pro_audio.get('bgm_path'):
                             st.markdown("---")
-                            with st.expander("🎵 BGM情報", expanded=False):
+                            with st.expander("🎵 BGM編集", expanded=False):
                                 bgm_start = st.session_state.pro_audio.get('bgm_start', 0.0)
                                 bgm_end = st.session_state.pro_audio.get('bgm_end', clip_duration)
-                                fade_in = st.session_state.pro_audio.get('bgm_fade_in', 0.0)
-                                fade_out = st.session_state.pro_audio.get('bgm_fade_out', 0.0)
                                 
-                                st.write(f"📁 ファイル: {Path(st.session_state.pro_audio['bgm_path']).name}")
-                                st.write(f"⏱️ {bgm_start:.1f}秒 〜 {bgm_end:.1f}秒")
-                                st.write(f"🔊 BGM音量: {st.session_state.pro_audio.get('bgm_volume', 0.5)*100:.0f}%")
-                                st.write(f"🔊 元音声音量: {st.session_state.pro_audio.get('original_volume', 1.0)*100:.0f}%")
+                                st.write(f"📁 現在のファイル: {Path(st.session_state.pro_audio['bgm_path']).name}")
                                 
-                                # フェード効果の表示
-                                if fade_in > 0 or fade_out > 0:
-                                    fade_effects = []
-                                    if fade_in > 0:
-                                        fade_effects.append(f"📈 フェードイン: {fade_in:.1f}秒")
-                                    if fade_out > 0:
-                                        fade_effects.append(f"📉 フェードアウト: {fade_out:.1f}秒")
-                                    st.info(" | ".join(fade_effects))
+                                # 新しいBGMファイルのアップロード
+                                new_bgm_file = st.file_uploader("新しいBGMに変更", type=['mp3', 'wav', 'm4a', 'aac'], key="bgm_replace_file")
+                                new_bgm_path = st.session_state.pro_audio['bgm_path']
+                                if new_bgm_file:
+                                    new_path = TEMP_AUDIOS_DIR / f"bgm_{new_bgm_file.name}"
+                                    with open(new_path, 'wb') as f:
+                                        f.write(new_bgm_file.read())
+                                    new_bgm_path = str(new_path)
+                                
+                                # 表示時間の編集
+                                st.write("**⏱️ 再生時間設定**")
+                                bgm_time_range = st.slider(
+                                    "BGM再生範囲（秒）",
+                                    min_value=0.0,
+                                    max_value=clip_duration,
+                                    value=(bgm_start, bgm_end),
+                                    step=0.1,
+                                    key="bgm_time_range_edit"
+                                )
+                                new_bgm_start, new_bgm_end = bgm_time_range
+                                
+                                # 音量の編集
+                                st.write("**🔊 音量設定**")
+                                col_bgm_vol, col_orig_vol = st.columns(2)
+                                with col_bgm_vol:
+                                    new_bgm_volume = st.slider(
+                                        "BGM音量（%）",
+                                        min_value=0,
+                                        max_value=100,
+                                        value=int(st.session_state.pro_audio.get('bgm_volume', 0.5) * 100),
+                                        step=5,
+                                        key="bgm_volume_edit"
+                                    ) / 100.0
+                                with col_orig_vol:
+                                    new_original_volume = st.slider(
+                                        "元音声音量（%）",
+                                        min_value=0,
+                                        max_value=100,
+                                        value=int(st.session_state.pro_audio.get('original_volume', 1.0) * 100),
+                                        step=5,
+                                        key="original_volume_edit"
+                                    ) / 100.0
+                                
+                                # フェード効果の編集
+                                st.write("**✨ フェード効果**")
+                                col_fade_in, col_fade_out = st.columns(2)
+                                with col_fade_in:
+                                    new_fade_in = st.slider(
+                                        "フェードイン（秒）",
+                                        min_value=0.0,
+                                        max_value=5.0,
+                                        value=st.session_state.pro_audio.get('bgm_fade_in', 0.0),
+                                        step=0.1,
+                                        key="bgm_fade_in_edit"
+                                    )
+                                with col_fade_out:
+                                    new_fade_out = st.slider(
+                                        "フェードアウト（秒）",
+                                        min_value=0.0,
+                                        max_value=5.0,
+                                        value=st.session_state.pro_audio.get('bgm_fade_out', 0.0),
+                                        step=0.1,
+                                        key="bgm_fade_out_edit"
+                                    )
+                                
+                                # 変更があれば更新ボタンを表示
+                                bgm_changes = (
+                                    new_bgm_path != st.session_state.pro_audio['bgm_path'] or
+                                    new_bgm_start != bgm_start or
+                                    new_bgm_end != bgm_end or
+                                    new_bgm_volume != st.session_state.pro_audio.get('bgm_volume', 0.5) or
+                                    new_original_volume != st.session_state.pro_audio.get('original_volume', 1.0) or
+                                    new_fade_in != st.session_state.pro_audio.get('bgm_fade_in', 0.0) or
+                                    new_fade_out != st.session_state.pro_audio.get('bgm_fade_out', 0.0)
+                                )
+                                
+                                col_save, col_remove = st.columns(2)
+                                with col_save:
+                                    if bgm_changes:
+                                        if st.button("💾 変更を保存", key="save_bgm", type="primary", use_container_width=True):
+                                            st.session_state.pro_audio['bgm_path'] = new_bgm_path
+                                            st.session_state.pro_audio['bgm_start'] = new_bgm_start
+                                            st.session_state.pro_audio['bgm_end'] = new_bgm_end
+                                            st.session_state.pro_audio['bgm_volume'] = new_bgm_volume
+                                            st.session_state.pro_audio['original_volume'] = new_original_volume
+                                            st.session_state.pro_audio['bgm_fade_in'] = new_fade_in
+                                            st.session_state.pro_audio['bgm_fade_out'] = new_fade_out
+                                            st.success("✅ BGM設定を更新しました")
+                                            st.rerun()
+                                with col_remove:
+                                    if st.button("🗑️ BGMを削除", key="remove_bgm", use_container_width=True):
+                                        st.session_state.pro_audio['bgm_path'] = None
+                                        st.session_state.pro_audio['bgm_start'] = 0.0
+                                        st.session_state.pro_audio['bgm_end'] = clip_duration
+                                        st.success("✅ BGMを削除しました")
+                                        st.rerun()
                     
                     st.markdown("---")
 
@@ -2434,29 +2636,35 @@ def main():
                         
                         col_p1, col_p2, col_p3 = st.columns(3)
                         with col_p1:
-                            if st.button("🌅 ヴィンテージ"):
+                            if st.button("🌅 ヴィンテージ", key="preset_vintage"):
                                 st.session_state.pro_effects['brightness'] = -0.1
                                 st.session_state.pro_effects['contrast'] = 1.2
                                 st.session_state.pro_effects['saturation'] = 0.7
+                                st.success("✅ ヴィンテージプリセットを適用しました")
                                 st.rerun()
                         with col_p2:
-                            if st.button("🌈 ビビッド"):
+                            if st.button("🌈 ビビッド", key="preset_vivid"):
                                 st.session_state.pro_effects['brightness'] = 0.1
                                 st.session_state.pro_effects['contrast'] = 1.3
                                 st.session_state.pro_effects['saturation'] = 1.5
+                                st.success("✅ ビビッドプリセットを適用しました")
                                 st.rerun()
                         with col_p3:
-                            if st.button("🌑 モノクロ"):
+                            if st.button("🌑 モノクロ", key="preset_mono"):
+                                st.session_state.pro_effects['brightness'] = 0.0
+                                st.session_state.pro_effects['contrast'] = 1.0
                                 st.session_state.pro_effects['saturation'] = 0.0
+                                st.success("✅ モノクロプリセットを適用しました")
                                 st.rerun()
                         
-                        if st.button("🔄 エフェクトをリセット"):
+                        if st.button("🔄 エフェクトをリセット", key="preset_reset"):
                             st.session_state.pro_effects = {
                                 'speed': 1.0,
                                 'brightness': 0.0,
                                 'contrast': 1.0,
                                 'saturation': 1.0
                             }
+                            st.success("✅ エフェクトをリセットしました")
                             st.rerun()
                     
                     
