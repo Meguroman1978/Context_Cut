@@ -958,7 +958,14 @@ def index_transcription_to_chromadb(transcription: Dict, video_name: str, client
     
     try:
         # コレクションの作成または取得
-        collection_name = f"video_{video_name}".replace(" ", "_").replace(".", "_")
+        # 🆕 日本語・特殊文字を安全な文字列に変換（英数字とアンダースコアのみ）
+        import re
+        import hashlib
+        # ファイル名のハッシュを生成（安全で一意な識別子）
+        name_hash = hashlib.md5(video_name.encode('utf-8')).hexdigest()[:8]
+        # 英数字のみ抽出（最大20文字）
+        safe_name = re.sub(r'[^a-zA-Z0-9]', '_', video_name)[:20]
+        collection_name = f"video_{safe_name}_{name_hash}"
         
         # 既存のコレクションを削除（更新の場合）
         try:
