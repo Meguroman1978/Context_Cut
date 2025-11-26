@@ -2194,7 +2194,8 @@ def main():
                 with open(output_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 st.session_state.video_path = output_path
-                st.success("✅ アップロード完了!")
+                st.success(f"✅ アップロード完了! ({uploaded_file.size/1024/1024:.1f}MB)")
+                st.rerun()  # 🆕 画面を更新して文字起こしセクションを表示
         
         # 文字起こし実行
         st.header("🎤 AI文字起こし")
