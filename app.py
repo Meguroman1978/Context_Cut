@@ -35,11 +35,13 @@ except ImportError as e:
 # ============================
 FONTS_DIR = Path("./fonts")
 TEMP_VIDEOS_DIR = Path("./temp_videos")
+TEMP_IMAGES_DIR = Path("./temp_images")  # 画像/ステッカー用一時ディレクトリ
+TEMP_AUDIOS_DIR = Path("./temp_audios")  # 音声用一時ディレクトリ
 CHROMADB_DIR = Path("./chromadb_data")
 TEXT_BACKGROUNDS_DIR = Path("./text_backgrounds")  # テキストレイヤー背景画像用
 
 # ディレクトリの作成
-for dir_path in [FONTS_DIR, TEMP_VIDEOS_DIR, CHROMADB_DIR, TEXT_BACKGROUNDS_DIR]:
+for dir_path in [FONTS_DIR, TEMP_VIDEOS_DIR, TEMP_IMAGES_DIR, TEMP_AUDIOS_DIR, CHROMADB_DIR, TEXT_BACKGROUNDS_DIR]:
     dir_path.mkdir(exist_ok=True, parents=True)
 
 # 日本語フォントライブラリ（Google Fonts - 商用利用可能）
@@ -825,14 +827,15 @@ def generate_search_suggestions(transcript_text: str, max_suggestions: int = 10)
         if keyword in text_lower and query not in matched_queries:
             matched_queries.append(query)
     
-    # マッチしたクエリが少ない場合、汎用候補を追加
+    # マッチしたクエリが少ない場合、具体的な汎用候補を追加
+    # 注意: 曖昧な表現（「具体例を挙げている箇所」「まとめている箇所」など）は使用しない
     if len(matched_queries) < 3:
         generic_suggestions = [
-            "重要な説明をしている箇所",
-            "詳しく説明している箇所",
-            "具体例を挙げている箇所",
-            "まとめている箇所",
-            "強調している箇所"
+            "製品・サービスの特徴について説明している箇所",
+            "使い方・操作方法について説明している箇所",
+            "注意事項・重要事項について説明している箇所",
+            "メリット・効果について説明している箇所",
+            "価格・料金について説明している箇所"
         ]
         for gen_sug in generic_suggestions:
             if gen_sug not in matched_queries:
