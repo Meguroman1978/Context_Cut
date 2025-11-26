@@ -1439,6 +1439,43 @@ def generate_professional_video(
         # テキストレイヤー
         text_layers = [l for l in layers if l['type'] == 'text']
         for text_layer in text_layers:
+            # テキスト位置の計算（プリセットまたは数値指定）
+            is_preset = text_layer.get('is_preset_position', False)
+            position_preset = text_layer.get('position_preset')
+            
+            # 🎯 プリセット位置の場合、drawtextとoverlayで同じ位置計算を使用
+            if is_preset and position_preset:
+                # drawtextフィルター用のテキスト位置
+                if position_preset == "下部中央":
+                    text_x = "(w-text_w)/2"
+                    text_y = "h-text_h-50"
+                elif position_preset == "上部中央":
+                    text_x = "(w-text_w)/2"
+                    text_y = "50"
+                elif position_preset == "中央":
+                    text_x = "(w-text_w)/2"
+                    text_y = "(h-text_h)/2"
+                elif position_preset == "左上":
+                    text_x = "50"
+                    text_y = "50"
+                elif position_preset == "右上":
+                    text_x = "w-text_w-50"
+                    text_y = "50"
+                elif position_preset == "左下":
+                    text_x = "50"
+                    text_y = "h-text_h-50"
+                elif position_preset == "右下":
+                    text_x = "w-text_w-50"
+                    text_y = "h-text_h-50"
+                else:
+                    # フォールバック: 中央
+                    text_x = "(w-text_w)/2"
+                    text_y = "(h-text_h)/2"
+            else:
+                # 数値指定の場合
+                text_x = text_layer['x']
+                text_y = text_layer['y']
+            
             # 背景画像がある場合、先に背景を配置
             bg_image_path = text_layer.get('background_image')
             if bg_image_path and Path(bg_image_path).exists():
@@ -1454,21 +1491,14 @@ def generate_professional_video(
                 if bg_opacity < 1.0:
                     bg_stream = bg_stream.filter('format', 'yuva420p').filter('colorchannelmixer', aa=bg_opacity)
                 
-                # 背景画像の位置計算（テキストに自動追従）
-                is_preset = text_layer.get('is_preset_position', False)
-                position_preset = text_layer.get('position_preset')
-                text_x_expr = str(text_layer['x'])
-                text_y_expr = str(text_layer['y'])
+                # 🎯 背景画像の位置: テキストと完全に同じ位置プリセットを使用
                 bg_x_offset = text_layer.get('background_x_offset', 0)
                 bg_y_offset = text_layer.get('background_y_offset', 0)
                 
-                # プリセット位置の場合、テキスト位置に基づいて背景を配置
+                # プリセット位置の場合、背景もテキストと同じ位置に
                 if is_preset and position_preset:
-                    # テキストの位置マッピング（drawtextフィルターの座標系）
-                    # 背景画像はテキストの中心に配置（overlayフィルターの座標系）
+                    # overlayフィルター用の背景位置（テキストと同じ位置ロジック）
                     if position_preset == "下部中央":
-                        # テキスト: (w-text_w)/2, h-text_h-50
-                        # 背景: テキストを中心に配置
                         bg_x = f"(main_w-overlay_w)/2+{bg_x_offset}"
                         bg_y = f"main_h-overlay_h-50+{bg_y_offset}"
                     elif position_preset == "上部中央":
@@ -1490,22 +1520,19 @@ def generate_professional_video(
                         bg_x = f"main_w-overlay_w-50+{bg_x_offset}"
                         bg_y = f"main_h-overlay_h-50+{bg_y_offset}"
                     else:
-                        # フォールバック: 中央配置
                         bg_x = f"(main_w-overlay_w)/2+{bg_x_offset}"
                         bg_y = f"(main_h-overlay_h)/2+{bg_y_offset}"
                 else:
-                    # 数値指定の場合: テキストの座標に合わせて背景を配置
-                    # テキストが背景の中心に来るように調整
+                    # 数値指定の場合: テキスト位置に背景を合わせる
                     try:
-                        text_x_num = int(text_x_expr)
-                        text_y_num = int(text_y_expr)
-                        # 背景をテキストの少し後ろ（左上）に配置してテキストを中心に
-                        bg_x = f"{text_x_num - 50 + bg_x_offset}"
-                        bg_y = f"{text_y_num - 30 + bg_y_offset}"
+                        text_x_num = int(str(text_x))
+                        text_y_num = int(str(text_y))
+                        # 背景の中心にテキストが来るように調整
+                        bg_x = f"{text_x_num + bg_x_offset}"
+                        bg_y = f"{text_y_num + bg_y_offset}"
                     except:
-                        # 式の場合はそのまま使用
-                        bg_x = f"{text_x_expr}+{bg_x_offset}"
-                        bg_y = f"{text_y_expr}+{bg_y_offset}"
+                        bg_x = f"{text_x}+{bg_x_offset}"
+                        bg_y = f"{text_y}+{bg_y_offset}"
                 
                 bg_enable_expr = f"between(t,{text_layer['start']},{text_layer['end']})"
                 
@@ -1527,10 +1554,8 @@ def generate_professional_video(
             escaped_text = escaped_text.replace(":", "\\:")
             escaped_text = escaped_text.replace("\n", " ")
             
-            # アニメーション適用
+            # アニメーション適用（text_x, text_yは既に上で計算済み）
             animation = text_layer.get('animation', 'none')
-            text_x = text_layer['x']
-            text_y = text_layer['y']
             text_alpha = '1.0'
             
             # テキストアニメーション
