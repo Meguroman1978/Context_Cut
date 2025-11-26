@@ -714,7 +714,7 @@ def transcribe_video(video_path: str, model) -> Optional[Dict]:
 
 
 def extract_text_from_video_frames(video_path: str, use_easyocr: bool = True) -> List[Dict]:
-    """動画フレームからOCRでテキストを抽出
+    """動画フレームからOCRでテキストを抽出（高速版）
     
     Args:
         video_path: 動画ファイルのパス
@@ -762,8 +762,8 @@ def extract_text_from_video_frames(video_path: str, use_easyocr: bool = True) ->
         
         st.info(f"📹 動画情報: {duration:.1f}秒, {fps:.1f}fps, {total_frames}フレーム")
         
-        # サンプリング間隔（1秒ごとにフレームを抽出）
-        sample_interval = max(1, int(fps))
+        # 🚀 高速化: サンプリング間隔を5秒に変更（従来の5倍高速）
+        sample_interval = max(1, int(fps * 5))  # 5秒ごと
         
         ocr_results = []
         progress_bar = st.progress(0)
@@ -787,33 +787,35 @@ def extract_text_from_video_frames(video_path: str, use_easyocr: bool = True) ->
                 progress_bar.progress(progress)
                 status_text.text(f"🔍 OCR処理中... {timestamp:.1f}秒 / {duration:.1f}秒")
                 
-                # 前処理: グレースケール化とコントラスト強調
+                # 🚀 高速化: シンプルなグレースケール変換のみ（前処理を最小化）
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                # アダプティブしきい値処理
-                processed = cv2.adaptiveThreshold(
-                    gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                    cv2.THRESH_BINARY, 11, 2
-                )
                 
                 # OCR実行
                 try:
                     if use_easyocr:
                         # EasyOCRで読み取り
-                        results = reader.readtext(processed)
+                        results = reader.readtext(gray)
                         for (bbox, text, confidence) in results:
-                            # 信頼度が低いものは除外
-                            if confidence > 0.5 and text.strip() and text != last_text:
-                                ocr_results.append({
-                                    "text": text.strip(),
-                                    "timestamp": timestamp,
-                                    "confidence": confidence
-                                })
-                                last_text = text
+                            # 🚀 高速化: 信頼度閾値を0.6に上げて処理削減
+                            if confidence > 0.6 and text.strip() and len(text.strip()) > 1:
+                                # 重複チェック（前後3件と比較）
+                                is_duplicate = False
+                                for recent in ocr_results[-3:]:
+                                    if recent['text'] == text.strip():
+                                        is_duplicate = True
+                                        break
+                                
+                                if not is_duplicate:
+                                    ocr_results.append({
+                                        "text": text.strip(),
+                                        "timestamp": timestamp,
+                                        "confidence": confidence
+                                    })
                     else:
                         # Tesseractで読み取り
-                        text = pytesseract.image_to_string(processed, config=tesseract_config)
+                        text = pytesseract.image_to_string(gray, config=tesseract_config)
                         text = text.strip()
-                        if text and text != last_text:
+                        if text and len(text) > 1 and text != last_text:
                             ocr_results.append({
                                 "text": text,
                                 "timestamp": timestamp,
@@ -978,13 +980,20 @@ def index_transcription_to_chromadb(transcription: Dict, video_name: str, client
             
             if combined_text:
                 documents.append(combined_text)
-                metadatas.append({
+                # 🆕 OCRテキストもmetadataに保存
+                metadata = {
                     'start': segment['start'],
                     'end': segment['end'],
                     'segment_id': i,
                     'has_ocr': len(ocr_texts) > 0,
                     'ocr_count': len(ocr_texts)
-                })
+                }
+                # OCRテキストをJSON文字列として保存
+                if ocr_texts:
+                    import json
+                    metadata['ocr_text'] = json.dumps(ocr_texts, ensure_ascii=False)
+                
+                metadatas.append(metadata)
                 ids.append(f"segment_{i}")
         
         if documents:
@@ -1013,6 +1022,7 @@ def index_transcription_to_chromadb(transcription: Dict, video_name: str, client
 def search_scenes(query: str, collection_name: str, client: chromadb.Client, n_results: int = 5) -> List[Dict]:
     """自然言語クエリでシーンを検索"""
     try:
+        import json
         collection = client.get_collection(name=collection_name)
         results = collection.query(
             query_texts=[query],
@@ -1022,12 +1032,21 @@ def search_scenes(query: str, collection_name: str, client: chromadb.Client, n_r
         scenes = []
         if results['metadatas'] and len(results['metadatas']) > 0:
             for i, metadata in enumerate(results['metadatas'][0]):
-                scenes.append({
+                scene = {
                     'text': results['documents'][0][i],
                     'start': metadata['start'],
                     'end': metadata['end'],
                     'segment_id': metadata['segment_id']
-                })
+                }
+                
+                # 🆕 OCRテキストを復元
+                if 'ocr_text' in metadata and metadata['ocr_text']:
+                    try:
+                        scene['ocr_text'] = json.loads(metadata['ocr_text'])
+                    except:
+                        pass
+                
+                scenes.append(scene)
         
         return scenes
     except Exception as e:
@@ -2328,6 +2347,13 @@ def main():
                             st.write(f"**テキスト:** {scene['text']}")
                             st.write(f"**開始:** {scene['start']:.2f}秒")
                             st.write(f"**終了:** {scene['end']:.2f}秒")
+                            
+                            # 🆕 OCRテキストを最後尾に表示
+                            if 'ocr_text' in scene and scene['ocr_text']:
+                                st.write("---")
+                                st.write("**🔍 OCRで検出されたテキスト:**")
+                                for ocr_text in scene['ocr_text']:
+                                    st.caption(f"📝 {ocr_text}")
                             
                             # ボタンを横並びに配置
                             col_btn1, col_btn2 = st.columns(2)
