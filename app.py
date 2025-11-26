@@ -391,65 +391,19 @@ def download_from_web(url: str, output_path: str) -> bool:
     # 出力パスから拡張子を除去（yt-dlpが自動的に付与）
     output_template = str(Path(output_path).with_suffix(''))
     
-    # 複数の設定を試す戦略（bot detection回避強化版）
+    # シンプルな設定（最新のyt-dlpに任せる）
     strategies = [
         {
-            'name': 'iOS専用設定（最新）',
-            'format': 'bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best',
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['ios', 'mweb'],
-                    'player_skip': ['webpage', 'js', 'configs'],
-                    'skip': ['dash', 'hls'],
-                }
-            }
+            'name': '標準設定',
+            'format': 'best[ext=mp4][height<=720]/best[height<=720]/best',
         },
         {
-            'name': 'Android TV設定（bot回避）',
-            'format': 'bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best',
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android_embedded', 'android', 'tv_embedded'],
-                    'player_skip': ['webpage'],
-                }
-            }
+            'name': '低画質設定',
+            'format': 'best[ext=mp4][height<=480]/best[height<=480]/best',
         },
         {
-            'name': '標準設定（高画質）',
-            'format': 'bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best',
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web'],
-                    'player_skip': ['webpage', 'configs'],
-                }
-            }
-        },
-        {
-            'name': '低画質設定（360p）',
-            'format': 'bestvideo[ext=mp4][height<=360]+bestaudio[ext=m4a]/best[ext=mp4][height<=360]/worst',
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android'],
-                }
-            }
-        },
-        {
-            'name': 'モバイルWeb設定',
-            'format': 'best[ext=mp4]/best',
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['mweb', 'android'],
-                }
-            }
-        },
-        {
-            'name': '最低品質（フォールバック）',
+            'name': '最低品質',
             'format': 'worst',
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android_creator'],
-                }
-            }
         }
     ]
     
@@ -457,43 +411,14 @@ def download_from_web(url: str, output_path: str) -> bool:
         try:
             st.info(f"🔄 試行 {idx+1}/{len(strategies)}: {strategy['name']}")
             
+            # シンプルな設定（最新のyt-dlpに最適化）
             ydl_opts = {
                 'format': strategy['format'],
                 'outtmpl': output_template,
                 'merge_output_format': 'mp4',
-                'quiet': False,
-                'no_warnings': False,
-                # 403エラー対策の強化設定
-                'nocheckcertificate': True,
-                'ignoreerrors': False,
-                'no_color': True,
-                'extractor_args': strategy['extractor_args'],
-                # より強力なヘッダー設定（iOS/Androidを装う）
-                'http_headers': {
-                    'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)' if 'ios' in str(strategy['extractor_args']) else 
-                                  'com.google.android.youtube/19.29.37 (Linux; U; Android 13) gzip',
-                    'Accept': '*/*',
-                    'Accept-Language': 'en-US,en;q=0.9,ja;q=0.8',
-                    'Accept-Encoding': 'gzip, deflate, br',
-                    'X-YouTube-Client-Name': '2',
-                    'X-YouTube-Client-Version': '2.20231219.04.00',
-                },
-                # YouTube特有の設定（bot検出回避強化）
-                'age_limit': None,
-                'geo_bypass': True,
-                'geo_bypass_country': 'US',
-                # リトライ設定
-                'retries': 5,
-                'fragment_retries': 5,
-                'skip_unavailable_fragments': True,
-                # bot検出回避（重要）
-                'extractor_retries': 3,
-                'file_access_retries': 3,
-                'sleep_interval': 1,
-                'max_sleep_interval': 5,
-                # 追加の安全設定
-                'verbose': False,
-                'no_check_certificate': True,
+                'quiet': True,
+                'no_warnings': True,
+                'noprogress': True,
             }
             
             if idx == 0:
