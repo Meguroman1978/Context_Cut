@@ -2278,8 +2278,12 @@ def main():
                                 video_name,
                                 st.session_state.chromadb_client
                             )
-                            st.session_state.collection_name = collection_name
-                            st.rerun()
+                            if collection_name:
+                                st.session_state.collection_name = collection_name
+                                st.success(f"✅ 文字起こし完了！コレクション名: {collection_name}")
+                                st.rerun()
+                            else:
+                                st.error("❌ ChromaDBへのインデックス化に失敗しました。文字起こしを再実行してください。")
             
             with col_trans2:
                 if st.button("⏭️ 文字起こしをスキップ", use_container_width=True):
@@ -2311,6 +2315,15 @@ def main():
         # タブ1: シーン検索
         with tab1:
             st.header("🔍 自然言語シーン検索")
+            
+            # 🆕 デバッグ情報（開発用）
+            with st.expander("🔧 デバッグ情報", expanded=False):
+                st.write(f"**video_path設定済み:** {bool(st.session_state.get('video_path'))}")
+                st.write(f"**transcription設定済み:** {bool(st.session_state.get('transcription'))}")
+                st.write(f"**collection_name:** {st.session_state.get('collection_name', 'None')}")
+                st.write(f"**skip_transcription:** {st.session_state.get('skip_transcription', False)}")
+                if st.session_state.get('transcription'):
+                    st.write(f"**セグメント数:** {len(st.session_state.transcription.get('segments', []))}")
             
             # 文字起こしがスキップされた場合の警告
             if st.session_state.get('skip_transcription', False):
