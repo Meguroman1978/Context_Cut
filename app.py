@@ -934,18 +934,28 @@ def combine_transcription_and_ocr(transcription: Dict, ocr_results: List[Dict]) 
 def setup_chromadb() -> chromadb.Client:
     """ChromaDBクライアントをセットアップ"""
     try:
+        # ディレクトリが存在しない場合は作成
+        CHROMADB_DIR.mkdir(parents=True, exist_ok=True)
+        
         client = chromadb.Client(Settings(
             persist_directory=str(CHROMADB_DIR),
             anonymized_telemetry=False
         ))
         return client
     except Exception as e:
-        st.error(f"ChromaDBのセットアップに失敗しました: {e}")
+        import traceback
+        error_detail = traceback.format_exc()
+        st.error(f"❌ ChromaDBのセットアップに失敗しました: {str(e)}\n\n詳細:\n```\n{error_detail}\n```")
         return None
 
 
 def index_transcription_to_chromadb(transcription: Dict, video_name: str, client: chromadb.Client):
     """文字起こし結果をChromaDBにインデックス化"""
+    # 🆕 clientがNoneの場合のチェック
+    if client is None:
+        st.session_state.index_error_msg = "❌ ChromaDBクライアントが初期化されていません。ページをリロードしてください。"
+        return None
+    
     try:
         # コレクションの作成または取得
         collection_name = f"video_{video_name}".replace(" ", "_").replace(".", "_")
@@ -2327,6 +2337,7 @@ def main():
                 st.write(f"**video_path設定済み:** {bool(st.session_state.get('video_path'))}")
                 st.write(f"**transcription設定済み:** {bool(st.session_state.get('transcription'))}")
                 st.write(f"**collection_name:** {st.session_state.get('collection_name', 'None')}")
+                st.write(f"**chromadb_client設定済み:** {st.session_state.get('chromadb_client') is not None}")
                 st.write(f"**skip_transcription:** {st.session_state.get('skip_transcription', False)}")
                 if st.session_state.get('transcription'):
                     st.write(f"**セグメント数:** {len(st.session_state.transcription.get('segments', []))}")
