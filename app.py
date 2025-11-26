@@ -2364,24 +2364,32 @@ def main():
                 n_results = st.slider("検索結果数", 1, 10, 5)
                 
                 if st.button("検索実行"):
-                    if search_query and st.session_state.collection_name:
-                        scenes = search_scenes(
-                            search_query,
-                            st.session_state.collection_name,
-                            st.session_state.chromadb_client,
-                            n_results
-                        )
-                        
-                        if scenes:
-                            # 検索結果をセッション状態に保存
-                            st.session_state.search_results = scenes
-                            st.success(f"✅ {len(scenes)}件のシーンが見つかりました!")
-                        else:
+                    if not search_query:
+                        st.warning("⚠️ 検索クエリを入力してください。")
+                    elif not st.session_state.get('collection_name'):
+                        st.error("❌ ChromaDBのコレクション名が設定されていません。文字起こしを再実行してください。")
+                    else:
+                        try:
+                            scenes = search_scenes(
+                                search_query,
+                                st.session_state.collection_name,
+                                st.session_state.chromadb_client,
+                                n_results
+                            )
+                            
+                            if scenes:
+                                # 検索結果をセッション状態に保存
+                                st.session_state.search_results = scenes
+                                st.success(f"✅ {len(scenes)}件のシーンが見つかりました!")
+                            else:
+                                st.session_state.search_results = []
+                                st.warning("検索結果が見つかりませんでした。")
+                        except Exception as e:
+                            st.error(f"❌ 検索中にエラーが発生しました: {str(e)}")
                             st.session_state.search_results = []
-                            st.warning("検索結果が見つかりませんでした。")
                 
                 # 検索結果の表示
-                if st.session_state.search_results:
+                if st.session_state.get('search_results'):
                     st.write(f"**{len(st.session_state.search_results)}件のシーン**")
                     
                     for i, scene in enumerate(st.session_state.search_results, 1):
