@@ -49,11 +49,7 @@ for dir_path in [FONTS_DIR, TEMP_VIDEOS_DIR, TEMP_IMAGES_DIR, TEMP_AUDIOS_DIR, C
 
 # カテゴリー1: 普通（読みやすく汎用的なゴシック・明朝体）
 FONTS_NORMAL = {
-    "Noto Sans JP": "https://github.com/google/fonts/raw/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf",
-    "Noto Serif JP": "https://github.com/google/fonts/raw/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf",
-    "M PLUS 1": "https://github.com/google/fonts/raw/main/ofl/mplus1/MPLUS1%5Bwght%5D.ttf",
     "M PLUS 1p": "https://github.com/google/fonts/raw/main/ofl/mplus1p/MPLUS1p-Regular.ttf",
-    "M PLUS 2": "https://github.com/google/fonts/raw/main/ofl/mplus2/MPLUS2%5Bwght%5D.ttf",
     "M PLUS Rounded 1c": "https://github.com/google/fonts/raw/main/ofl/mplusrounded1c/MPLUSRounded1c-Regular.ttf",
     "Kosugi": "https://github.com/google/fonts/raw/main/apache/kosugi/Kosugi-Regular.ttf",
     "Kosugi Maru": "https://github.com/google/fonts/raw/main/apache/kosugimaru/KosugiMaru-Regular.ttf",
@@ -64,7 +60,10 @@ FONTS_NORMAL = {
     "BIZ UDMincho": "https://github.com/google/fonts/raw/main/ofl/bizudmincho/BIZUDMincho-Regular.ttf",
     "BIZ UDPMincho": "https://github.com/google/fonts/raw/main/ofl/bizudpmincho/BIZUDPMincho-Regular.ttf",
     "Kiwi Maru": "https://github.com/google/fonts/raw/main/ofl/kiwimaru/KiwiMaru-Regular.ttf",
-    "Murecho": "https://github.com/google/fonts/raw/main/ofl/murecho/Murecho%5Bwght%5D.ttf",
+    "Noto Sans JP": "https://github.com/google/fonts/raw/main/ofl/notosansjp/static/NotoSansJP-Regular.ttf",
+    "Noto Serif JP": "https://github.com/google/fonts/raw/main/ofl/notoserifjp/static/NotoSerifJP-Regular.ttf",
+    "RocknRoll One": "https://github.com/google/fonts/raw/main/ofl/rocknrollone/RocknRollOne-Regular.ttf",
+    "Shippori Antique": "https://github.com/google/fonts/raw/main/ofl/shipporiantique/ShipporiAntique-Regular.ttf",
 }
 
 # カテゴリー2: スタイリッシュ（モダン・都会的・洗練されたデザイン）
@@ -73,21 +72,20 @@ FONTS_STYLISH = {
     "Zen Kaku Gothic Antique": "https://github.com/google/fonts/raw/main/ofl/zenkakugothicantique/ZenKakuGothicAntique-Regular.ttf",
     "Zen Maru Gothic": "https://github.com/google/fonts/raw/main/ofl/zenmarugothic/ZenMaruGothic-Regular.ttf",
     "Stick": "https://github.com/google/fonts/raw/main/apache/stick/Stick-Regular.ttf",
-    "M PLUS 1 Code": "https://github.com/google/fonts/raw/main/ofl/mplus1code/MPLUS1Code%5Bwght%5D.ttf",
-    "Shippori Antique": "https://github.com/google/fonts/raw/main/ofl/shipporiantique/ShipporiAntique-Regular.ttf",
     "Zen Dots": "https://github.com/google/fonts/raw/main/ofl/zendots/ZenDots-Regular.ttf",
     "Zen Kurenaido": "https://github.com/google/fonts/raw/main/ofl/zenkurenaido/ZenKurenaido-Regular.ttf",
     "Zen Loop": "https://github.com/google/fonts/raw/main/ofl/zenloop/ZenLoop-Regular.ttf",
     "DotGothic16": "https://github.com/google/fonts/raw/main/ofl/dotgothic16/DotGothic16-Regular.ttf",
-    "RocknRoll One": "https://github.com/google/fonts/raw/main/ofl/rocknrollone/RocknRollOne-Regular.ttf",
     "Train One": "https://github.com/google/fonts/raw/main/ofl/trainone/TrainOne-Regular.ttf",
+    "Dela Gothic One": "https://github.com/google/fonts/raw/main/ofl/delagothicone/DelaGothicOne-Regular.ttf",
+    "Zen Old Mincho": "https://github.com/google/fonts/raw/main/ofl/zenoldmincho/ZenOldMincho-Regular.ttf",
+    "New Tegomin": "https://github.com/google/fonts/raw/main/ofl/newtegomin/NewTegomin-Regular.ttf",
 }
 
 # カテゴリー3: 漫画風（ポップ・可愛い・インパクト）
 FONTS_COMIC = {
     "Mochiy Pop One": "https://github.com/google/fonts/raw/main/ofl/mochiypopone/MochiyPopOne-Regular.ttf",
     "Mochiy Pop P One": "https://github.com/google/fonts/raw/main/ofl/mochiypoppone/MochiyPopPOne-Regular.ttf",
-    "Dela Gothic One": "https://github.com/google/fonts/raw/main/ofl/delagothicone/DelaGothicOne-Regular.ttf",
     "Hachi Maru Pop": "https://github.com/google/fonts/raw/main/ofl/hachimarupop/HachiMaruPop-Regular.ttf",
     "Potta One": "https://github.com/google/fonts/raw/main/ofl/pottaone/PottaOne-Regular.ttf",
     "Reggae One": "https://github.com/google/fonts/raw/main/ofl/reggaeone/ReggaeOne-Regular.ttf",
@@ -95,6 +93,7 @@ FONTS_COMIC = {
     "Darumadrop One": "https://github.com/google/fonts/raw/main/ofl/darumadropone/DarumadropOne-Regular.ttf",
     "Cherry Bomb One": "https://github.com/google/fonts/raw/main/ofl/cherrybombone/CherryBombOne-Regular.ttf",
     "Slackside One": "https://github.com/google/fonts/raw/main/ofl/slacksideone/SlacksideOne-Regular.ttf",
+    "Yusei Magic": "https://github.com/google/fonts/raw/main/ofl/yuseimagic/YuseiMagic-Regular.ttf",
 }
 
 # カテゴリー4: 古風・和風（伝統的・書道風・和の雰囲気）
@@ -103,12 +102,10 @@ FONTS_TRADITIONAL = {
     "Shippori Mincho B1": "https://github.com/google/fonts/raw/main/ofl/shipporiminchob1/ShipporiMinchoB1-Regular.ttf",
     "Zen Antique": "https://github.com/google/fonts/raw/main/ofl/zenantique/ZenAntique-Regular.ttf",
     "Zen Antique Soft": "https://github.com/google/fonts/raw/main/ofl/zenantiquesoft/ZenAntiqueSoft-Regular.ttf",
-    "Zen Old Mincho": "https://github.com/google/fonts/raw/main/ofl/zenoldmincho/ZenOldMincho-Regular.ttf",
     "Kaisei Tokumin": "https://github.com/google/fonts/raw/main/ofl/kaiseitokumin/KaiseiTokumin-Regular.ttf",
     "Kaisei Opti": "https://github.com/google/fonts/raw/main/ofl/kaiseiopti/KaiseiOpti-Regular.ttf",
     "Kaisei HarunoUmi": "https://github.com/google/fonts/raw/main/ofl/kaiseiharunoumi/KaiseiHarunoUmi-Regular.ttf",
     "Kaisei Decol": "https://github.com/google/fonts/raw/main/ofl/kaiseidecol/KaiseiDecol-Regular.ttf",
-    "New Tegomin": "https://github.com/google/fonts/raw/main/ofl/newtegomin/NewTegomin-Regular.ttf",
     "Yuji Syuku": "https://github.com/google/fonts/raw/main/ofl/yujisyuku/YujiSyuku-Regular.ttf",
     "Yuji Boku": "https://github.com/google/fonts/raw/main/ofl/yujiboku/YujiBoku-Regular.ttf",
     "Yuji Mai": "https://github.com/google/fonts/raw/main/ofl/yujimai/YujiMai-Regular.ttf",
@@ -119,10 +116,11 @@ FONTS_TRADITIONAL = {
 
 # カテゴリー5: その他（手書き風・ユニーク・特殊）
 FONTS_OTHERS = {
-    "Yusei Magic": "https://github.com/google/fonts/raw/main/ofl/yuseimagic/YuseiMagic-Regular.ttf",
     "Klee One": "https://github.com/google/fonts/raw/main/ofl/kleeone/KleeOne-Regular.ttf",
     "Yomogi": "https://github.com/google/fonts/raw/main/ofl/yomogi/Yomogi-Regular.ttf",
     "Yatra One": "https://github.com/google/fonts/raw/main/ofl/yatraone/YatraOne-Regular.ttf",
+    "Kiwi Maru Light": "https://github.com/google/fonts/raw/main/ofl/kiwimaru/KiwiMaru-Light.ttf",
+    "Kiwi Maru Medium": "https://github.com/google/fonts/raw/main/ofl/kiwimaru/KiwiMaru-Medium.ttf",
 }
 
 # すべてのフォントを統合（後方互換性のため）
@@ -180,12 +178,12 @@ def download_japanese_fonts():
     return downloaded_count
 
 # 初回起動時にフォントをダウンロード
-if not (FONTS_DIR / "Noto_Sans_JP.ttf").exists():
+if not (FONTS_DIR / "M_PLUS_1p.ttf").exists():
     print("日本語フォントを初期化中...")
     downloaded = download_japanese_fonts()
     print(f"{downloaded}個のフォントをダウンロードしました")
 
-DEFAULT_FONT = FONTS_DIR / "Noto_Sans_JP.ttf"
+DEFAULT_FONT = FONTS_DIR / "M_PLUS_1p.ttf"
 
 # ============================
 # ユーティリティ関数
@@ -1524,7 +1522,7 @@ def main():
     st.title("🎬 Context Cut Pro")
     st.subheader("切り抜き動画生成＆編集ツール")
     
-    # カスタムCSS: プレビュー動画を1/4サイズに縮小
+    # カスタムCSS: プレビュー動画を1/4サイズに縮小 & レイヤー一覧にグレー背景
     st.markdown("""
         <style>
         /* プレビュー動画のサイズを縮小 */
@@ -1540,6 +1538,14 @@ def main():
             width: 300px !important;
             margin: 0 auto;
             display: block;
+        }
+        
+        /* レイヤー一覧エリアにグレー背景 */
+        .layer-list-container {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -2055,6 +2061,7 @@ def main():
                         total_items += 1
                     
                     if total_items > 0:
+                        st.markdown('<div class="layer-list-container">', unsafe_allow_html=True)
                         st.write(f"**📚 レイヤー一覧** ({total_items}個)")
                         
                         # レイヤー概要を表示
@@ -2367,6 +2374,8 @@ def main():
                                         st.session_state.pro_audio['bgm_end'] = clip_duration
                                         st.success("✅ BGMを削除しました")
                                         st.rerun()
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
                     
                     st.markdown("---")
 
