@@ -982,11 +982,11 @@ def index_transcription_to_chromadb(transcription: Dict, video_name: str, client
                 documents.append(combined_text)
                 # 🆕 OCRテキストもmetadataに保存
                 metadata = {
-                    'start': segment['start'],
-                    'end': segment['end'],
-                    'segment_id': i,
-                    'has_ocr': len(ocr_texts) > 0,
-                    'ocr_count': len(ocr_texts)
+                    'start': float(segment['start']),  # 🆕 明示的にfloatに変換
+                    'end': float(segment['end']),      # 🆕 明示的にfloatに変換
+                    'segment_id': int(i),              # 🆕 明示的にintに変換
+                    'has_ocr': bool(len(ocr_texts) > 0),  # 🆕 明示的にboolに変換
+                    'ocr_count': int(len(ocr_texts))    # 🆕 明示的にintに変換
                 }
                 # OCRテキストをJSON文字列として保存
                 if ocr_texts:
@@ -1003,19 +1003,21 @@ def index_transcription_to_chromadb(transcription: Dict, video_name: str, client
                 ids=ids
             )
             
-            # OCR統計を表示
+            # OCR統計を表示（st.rerun()前に表示するため、session_stateに保存）
             ocr_segments = sum(1 for meta in metadatas if meta.get('has_ocr', False))
+            success_msg = f"✅ {len(documents)}件のセグメントをインデックス化しました"
             if ocr_segments > 0:
-                st.success(f"✅ {len(documents)}件のセグメントをインデックス化しました（うち{ocr_segments}件にOCRテキスト含む）")
-            else:
-                st.success(f"✅ {len(documents)}件のセグメントをインデックス化しました!")
+                success_msg += f"（うち{ocr_segments}件にOCRテキスト含む）"
+            st.session_state.index_success_msg = success_msg
             return collection_name
         else:
-            st.warning("インデックス化可能なテキストが見つかりませんでした。")
+            st.session_state.index_error_msg = "インデックス化可能なテキストが見つかりませんでした。"
             return None
             
     except Exception as e:
-        st.error(f"インデックス化に失敗しました: {e}")
+        import traceback
+        error_detail = traceback.format_exc()
+        st.session_state.index_error_msg = f"インデックス化に失敗しました: {str(e)}\n\n詳細:\n{error_detail}"
         return None
 
 
@@ -2199,6 +2201,14 @@ def main():
     
     # メインエリア
     if st.session_state.video_path:
+        # 🆕 インデックス化の成功/失敗メッセージを表示
+        if 'index_success_msg' in st.session_state:
+            st.success(st.session_state.index_success_msg)
+            del st.session_state.index_success_msg
+        if 'index_error_msg' in st.session_state:
+            st.error(st.session_state.index_error_msg)
+            del st.session_state.index_error_msg
+        
         # 文字起こし実行セクション（メインエリアに配置）
         if st.session_state.transcription is None:
             st.header("🎤 AI文字起こし")
@@ -2278,12 +2288,8 @@ def main():
                                 video_name,
                                 st.session_state.chromadb_client
                             )
-                            if collection_name:
-                                st.session_state.collection_name = collection_name
-                                st.success(f"✅ 文字起こし完了！コレクション名: {collection_name}")
-                                st.rerun()
-                            else:
-                                st.error("❌ ChromaDBへのインデックス化に失敗しました。文字起こしを再実行してください。")
+                            st.session_state.collection_name = collection_name
+                            st.rerun()
             
             with col_trans2:
                 if st.button("⏭️ 文字起こしをスキップ", use_container_width=True):
