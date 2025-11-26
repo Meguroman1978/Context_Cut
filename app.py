@@ -610,16 +610,13 @@ def download_from_web(url: str, output_path: str) -> bool:
                 st.info("この動画は非公開または削除されている可能性があります")
             else:
                 st.error(f"❌ **エラー詳細**: {error_msg}")
-                elif "Private video" in error_msg:
-                    st.error("❌ この動画は非公開です")
-                elif "Video unavailable" in error_msg:
-                    st.error("❌ この動画は利用できません")
-                else:
-                    st.error(f"❌ ダウンロードエラー: {error_msg}")
+            
+            # 全ての戦略を試したか確認
+            if idx >= len(strategies) - 1:
                 return False
             else:
                 # 次の戦略を試す
-                st.warning(f"⚠️ {strategy['name']}では失敗: {error_msg[:100]}...")
+                st.warning(f"⚠️ {strategy['name']}では失敗、次の戦略を試します...")
                 continue
                 
         except Exception as e:
