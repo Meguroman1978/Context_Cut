@@ -1592,7 +1592,19 @@ def generate_professional_video(
                 enable=enable_expr
             )
         
-        # オーディオ
+        # オーディオ処理
+        video_duration = end_time - start_time
+        
+        # 🆕 元動画の音声に自動フェード効果を適用
+        auto_audio_fade = audio_settings.get('auto_audio_fade', True)
+        if auto_audio_fade and video_duration > 4.0:  # 4秒以上の動画のみ適用
+            # フェードイン（開始2秒）
+            audio_stream = audio_stream.filter('afade', type='in', start_time=0, duration=2.0)
+            # フェードアウト（終了2秒）
+            if video_duration > 2.0:
+                fade_out_start = video_duration - 2.0
+                audio_stream = audio_stream.filter('afade', type='out', start_time=fade_out_start, duration=2.0)
+        
         bgm_path = audio_settings.get('bgm_path')
         if bgm_path and Path(bgm_path).exists():
             # BGMを読み込み
@@ -1601,7 +1613,6 @@ def generate_professional_video(
             # BGMのタイミング設定を取得
             bgm_start = audio_settings.get('bgm_start', 0.0)
             bgm_end = audio_settings.get('bgm_end')
-            video_duration = end_time - start_time
             
             if bgm_end is None or bgm_end > video_duration:
                 bgm_end = video_duration
@@ -2569,6 +2580,46 @@ def main():
                                         with col_color:
                                             new_color = st.color_picker("テキスト色", value=layer['color'], key=f"layer_color_{i}")
                                         
+                                        # 🆕 表示位置の編集
+                                        st.write("**📐 表示位置設定**")
+                                        is_preset = layer.get('is_preset_position', False)
+                                        position_mode = st.radio(
+                                            "位置指定方法",
+                                            ["プリセット", "座標指定"],
+                                            index=0 if is_preset else 1,
+                                            key=f"layer_pos_mode_{i}",
+                                            horizontal=True
+                                        )
+                                        
+                                        new_is_preset = (position_mode == "プリセット")
+                                        new_position_preset = layer.get('position_preset', '下部中央')
+                                        new_x = layer.get('x', 100)
+                                        new_y = layer.get('y', 100)
+                                        
+                                        if position_mode == "プリセット":
+                                            position_options = ["下部中央", "上部中央", "中央", "左上", "右上", "左下", "右下"]
+                                            current_preset = layer.get('position_preset', '下部中央')
+                                            new_position_preset = st.selectbox(
+                                                "位置を選択",
+                                                position_options,
+                                                index=position_options.index(current_preset) if current_preset in position_options else 0,
+                                                key=f"layer_pos_preset_{i}"
+                                            )
+                                        else:
+                                            col_x, col_y = st.columns(2)
+                                            with col_x:
+                                                try:
+                                                    current_x = int(float(layer.get('x', 100)))
+                                                except (ValueError, TypeError):
+                                                    current_x = 100
+                                                new_x = st.number_input("X座標", min_value=0, max_value=2000, value=current_x, step=10, key=f"layer_text_x_{i}")
+                                            with col_y:
+                                                try:
+                                                    current_y = int(float(layer.get('y', 100)))
+                                                except (ValueError, TypeError):
+                                                    current_y = 100
+                                                new_y = st.number_input("Y座標", min_value=0, max_value=2000, value=current_y, step=10, key=f"layer_text_y_{i}")
+                                        
                                         # 背景画像の編集
                                         st.write("**🖼️ 背景画像設定**")
                                         bg_mode = st.radio(
@@ -2610,6 +2661,9 @@ def main():
                                             new_content != layer['content'] or
                                             new_font_size != layer['font_size'] or
                                             new_color != layer['color'] or
+                                            new_is_preset != layer.get('is_preset_position', False) or
+                                            (new_is_preset and new_position_preset != layer.get('position_preset', '下部中央')) or
+                                            (not new_is_preset and (new_x != layer.get('x', 100) or new_y != layer.get('y', 100))) or
                                             (bg_mode == "なし" and layer.get('background_image')) or
                                             (bg_mode != "なし" and new_bg_image and new_bg_image != layer.get('background_image')) or
                                             new_bg_size != layer.get('background_size', 1.2) or
@@ -2621,6 +2675,14 @@ def main():
                                                 st.session_state.pro_layers[i]['content'] = new_content
                                                 st.session_state.pro_layers[i]['font_size'] = new_font_size
                                                 st.session_state.pro_layers[i]['color'] = new_color
+                                                # 🆕 位置設定の保存
+                                                st.session_state.pro_layers[i]['is_preset_position'] = new_is_preset
+                                                if new_is_preset:
+                                                    st.session_state.pro_layers[i]['position_preset'] = new_position_preset
+                                                else:
+                                                    st.session_state.pro_layers[i]['x'] = new_x
+                                                    st.session_state.pro_layers[i]['y'] = new_y
+                                                # 背景画像の保存
                                                 if bg_mode == "なし":
                                                     st.session_state.pro_layers[i]['background_image'] = None
                                                 else:
@@ -3030,19 +3092,33 @@ def main():
                             preset_backgrounds = list(TEXT_BACKGROUNDS_DIR.glob("*.png")) + list(TEXT_BACKGROUNDS_DIR.glob("*.jpg"))
                             if preset_backgrounds:
                                 bg_names = [bg.stem for bg in preset_backgrounds]
+                                
+                                # 🆕 選択変更時にプレビューを即座に更新
+                                def update_bg_preview():
+                                    if 'text_preset_bg' in st.session_state:
+                                        selected = st.session_state.text_preset_bg
+                                        matching_bg = [bg for bg in preset_backgrounds if bg.stem == selected]
+                                        if matching_bg:
+                                            st.session_state.preview_bg_path = str(matching_bg[0])
+                                            st.session_state.preview_with_background = True
+                                
                                 selected_bg_name = st.selectbox(
                                     "背景画像を選択",
                                     bg_names,
-                                    key="text_preset_bg"
+                                    key="text_preset_bg",
+                                    on_change=update_bg_preview
                                 )
-                                text_bg_path = str(TEXT_BACKGROUNDS_DIR / f"{selected_bg_name}{[bg for bg in preset_backgrounds if bg.stem == selected_bg_name][0].suffix}")
                                 
-                                # プレビュー用にセッション状態を更新
-                                st.session_state.preview_bg_path = text_bg_path
-                                st.session_state.preview_with_background = True
-                                
-                                # プレビュー表示
-                                if Path(text_bg_path).exists():
+                                # 選択された背景のパスを取得
+                                matching_bg = [bg for bg in preset_backgrounds if bg.stem == selected_bg_name]
+                                if matching_bg:
+                                    text_bg_path = str(matching_bg[0])
+                                    
+                                    # プレビュー用にセッション状態を更新
+                                    st.session_state.preview_bg_path = text_bg_path
+                                    st.session_state.preview_with_background = True
+                                    
+                                    # プレビュー表示
                                     st.image(text_bg_path, caption=f"選択した背景: {selected_bg_name}", width=200)
                             else:
                                 st.info("💡 プリセット背景画像がまだありません。カスタム画像をアップロードしてください。")
@@ -3343,44 +3419,42 @@ def main():
                         
                         # エフェクトプリセット
                         st.markdown("---")
-                        st.write("**クイックプリセット**")
-                        
-                        col_p1, col_p2, col_p3 = st.columns(3)
-                        with col_p1:
-                            if st.button("🌅 ヴィンテージ", key="preset_vintage"):
-                                st.session_state.pro_effects['brightness'] = -0.1
-                                st.session_state.pro_effects['contrast'] = 1.2
-                                st.session_state.pro_effects['saturation'] = 0.7
-                                st.success("✅ ヴィンテージプリセットを適用しました")
-                                st.rerun()
-                        with col_p2:
-                            if st.button("🌈 ビビッド", key="preset_vivid"):
-                                st.session_state.pro_effects['brightness'] = 0.1
-                                st.session_state.pro_effects['contrast'] = 1.3
-                                st.session_state.pro_effects['saturation'] = 1.5
-                                st.success("✅ ビビッドプリセットを適用しました")
-                                st.rerun()
-                        with col_p3:
-                            if st.button("🌑 モノクロ", key="preset_mono"):
-                                st.session_state.pro_effects['brightness'] = 0.0
-                                st.session_state.pro_effects['contrast'] = 1.0
-                                st.session_state.pro_effects['saturation'] = 0.0
-                                st.success("✅ モノクロプリセットを適用しました")
-                                st.rerun()
-                        
-                        if st.button("🔄 エフェクトをリセット", key="preset_reset"):
-                            st.session_state.pro_effects = {
-                                'speed': 1.0,
-                                'brightness': 0.0,
-                                'contrast': 1.0,
-                                'saturation': 1.0
-                            }
-                            st.success("✅ エフェクトをリセットしました")
+                        # 🆕 エフェクトリセット（再生速度とカラーフィルターをデフォルトに）
+                        if st.button("🔄 エフェクトをリセット", key="preset_reset", type="secondary"):
+                            st.session_state.pro_effects['speed'] = 1.0
+                            st.session_state.pro_effects['brightness'] = 0.0
+                            st.session_state.pro_effects['contrast'] = 1.0
+                            st.session_state.pro_effects['saturation'] = 1.0
+                            st.success("✅ エフェクトをデフォルト値にリセットしました")
                             st.rerun()
                     
                     
                     # オーディオ
                     st.subheader("🎵 オーディオ")
+                    
+                    # 🆕 元動画のオーディオフェード設定
+                    with st.expander("🎧 元動画の音声設定", expanded=False):
+                        st.write("**🎚️ 自動フェードエフェクト**")
+                        st.caption("切り抜いた動画部分の音声に自動的にフェード効果を適用します")
+                        
+                        # デフォルトでチェックを入れる
+                        if 'auto_audio_fade' not in st.session_state.pro_audio:
+                            st.session_state.pro_audio['auto_audio_fade'] = True
+                        
+                        auto_fade = st.checkbox(
+                            "🔊 元動画の音声に自動フェードを適用",
+                            value=st.session_state.pro_audio.get('auto_audio_fade', True),
+                            key="auto_audio_fade_check",
+                            help="切り抜き開始時にフェードイン（2秒）、終了時にフェードアウト（2秒）を自動適用します"
+                        )
+                        st.session_state.pro_audio['auto_audio_fade'] = auto_fade
+                        
+                        if auto_fade:
+                            st.info("✅ 元動画の音声に自動フェード効果が適用されます")
+                            st.caption("📈 開始: 2秒かけてフェードイン")
+                            st.caption("📉 終了: 2秒かけてフェードアウト")
+                        else:
+                            st.info("⚪ 元動画の音声はそのまま使用されます")
                     
                     with st.expander("🎵 BGMを追加", expanded=False):
                         bgm_file = st.file_uploader("BGM音楽ファイル（MP3, WAV）", type=['mp3', 'wav'], key="new_bgm")
