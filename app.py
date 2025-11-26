@@ -2195,11 +2195,13 @@ def main():
                     f.write(uploaded_file.getbuffer())
                 st.session_state.video_path = output_path
                 st.success(f"✅ アップロード完了! ({uploaded_file.size/1024/1024:.1f}MB)")
-                st.info("👇 下にスクロールして、AI文字起こしの設定を行ってください。")
-        
-        # 文字起こし実行
-        st.header("🎤 AI文字起こし")
-        if st.session_state.video_path:
+                st.info("👇 この下の「🎤 AI文字起こし」セクションで処理を続けてください。")
+    
+    # メインエリア
+    if st.session_state.video_path:
+        # 文字起こし実行セクション（メインエリアに配置）
+        if st.session_state.transcription is None:
+            st.header("🎤 AI文字起こし")
             st.info("💡 シーン検索機能を使用する場合は文字起こしが必要です。\n文字起こしなしでも、カット範囲指定とテロップ編集は使用できます。")
             
             # OCRオプション
@@ -2277,6 +2279,7 @@ def main():
                                 st.session_state.chromadb_client
                             )
                             st.session_state.collection_name = collection_name
+                            st.rerun()
             
             with col_trans2:
                 if st.button("⏭️ 文字起こしをスキップ", use_container_width=True):
@@ -2285,34 +2288,11 @@ def main():
                     st.session_state.skip_transcription = True
                     st.success("✅ 文字起こしをスキップしました。カット範囲指定とテロップ編集が使用できます。")
                     st.rerun()
-        else:
-            st.info("まず動画を取得してください。")
-    
-    # メインエリア
-    if st.session_state.video_path:
-        # 🆕 動画が取得されたが文字起こしがまだの場合
-        if st.session_state.transcription is None:
-            st.success("✅ 動画の取得が完了しました！")
-            st.info("👈 次のステップ: サイドバーの「🎤 AI文字起こし」セクションで設定を行い、「🎤 文字起こしを実行」をクリックしてください。")
-            st.info("💡 文字起こしをスキップして、直接カット範囲指定やテロップ編集を行うこともできます。")
-            
-            # サイドバーの文字起こしセクションへの誘導
-            with st.expander("📖 文字起こしの使い方", expanded=True):
-                st.markdown("""
-                ### 文字起こしの手順:
-                
-                1. **サイドバーを確認**
-                   - 左側のサイドバーに「🎤 AI文字起こし」セクションがあります
-                
-                2. **オプションを選択**
-                   - OCR（動画内テキスト抽出）の有効/無効
-                   - Whisperモデル（高速/バランス/高精度）
-                
-                3. **文字起こしを実行**
-                   - 「🎤 文字起こしを実行」ボタンをクリック
-                   - または「⏭️ 文字起こしをスキップ」でスキップも可能
-                
-                4. **完了後**
+        
+        # 文字起こし完了後のメイン画面
+        elif st.session_state.transcription is not None:
+            st.success("✅ 動画の取得と文字起こしが完了しました！")
+            st.info("💡 下のタブから「シーン検索」または「動画編集」を選択してください
                    - シーン検索と動画編集のタブが表示されます
                 """)
     
