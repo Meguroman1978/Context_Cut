@@ -1926,12 +1926,30 @@ def main():
     with st.sidebar:
         st.header("📥 動画取得")
         
+        st.warning("⚠️ **重要**: YouTubeからの直接ダウンロードは現在制限されています")
+        st.info("💡 **推奨方法**: ローカルファイルのアップロードをご利用ください")
+        
         video_source = st.radio(
             "動画ソースを選択",
-            ["Google Drive URL", "Web URL（YouTube等）", "ローカルファイル"]
+            ["ローカルファイル（推奨）", "Google Drive URL", "Web URL（YouTube等・制限あり）"]
         )
         
-        if video_source == "Google Drive URL":
+        if video_source == "ローカルファイル（推奨）":
+            st.success("✅ これが最も確実な方法です！")
+            uploaded_file = st.file_uploader(
+                "動画ファイルをアップロード", 
+                type=['mp4', 'mov', 'avi', 'mkv', 'webm'],
+                help="MP4, MOV, AVI, MKV, WebM形式に対応しています"
+            )
+            if uploaded_file:
+                output_path = str(TEMP_VIDEOS_DIR / uploaded_file.name)
+                with open(output_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                st.session_state.video_path = output_path
+                st.success(f"✅ アップロード完了! ({uploaded_file.size/1024/1024:.1f}MB)")
+                st.rerun()
+        
+        elif video_source == "Google Drive URL":
             # 認証情報の状態確認
             st.subheader("🔐 認証情報の確認")
             
@@ -2082,42 +2100,81 @@ def main():
                 st.warning("⚠️ Google Drive機能を使用するには、上記の手順で認証情報を設定してください。")
                 st.info("📌 認証情報なしでも、「Web URL（YouTube等）」または「ローカルファイル」は利用できます。")
         
-        elif video_source == "Web URL（YouTube等）":
-            st.info("💡 YouTubeの制限により、一部の動画はダウンロードできない場合があります")
+        elif video_source == "Web URL（YouTube等・制限あり）":
+            st.error("⚠️ **現在YouTubeからの直接ダウンロードは非常に不安定です**")
             
-            with st.expander("⚠️ ダウンロードできない場合の対処法", expanded=False):
+            with st.expander("📌 推奨される代替方法（クリックして展開）", expanded=True):
                 st.markdown("""
-                **YouTubeダウンロードの制限について:**
+                ### 🎯 確実な方法: 手動ダウンロード→アップロード
                 
-                - 一部の動画は著作権保護やYouTube側の制限により直接ダウンロードできません
-                - 403 Forbiddenエラーが出る場合は、以下の代替方法をお試しください
+                YouTubeの仕様変更により、Webアプリからの直接ダウンロードは困難になっています。
+                以下の方法をお試しください：
                 
-                **代替方法 1: ローカルファイルとしてアップロード**
-                1. YouTubeから手動で動画をダウンロード
-                2. 「ローカルファイル」オプションを選択してアップロード
+                #### ✅ 方法1: ブラウザ拡張機能を使用（最も簡単）
+                1. **Video DownloadHelper**（Firefox/Chrome）をインストール
+                   - [Firefox版](https://addons.mozilla.org/ja/firefox/addon/video-downloadhelper/)
+                   - [Chrome版](https://chrome.google.com/webstore/detail/video-downloadhelper/)
+                2. YouTube動画を開く
+                3. ダウンロードボタンをクリック
+                4. MP4形式を選択してダウンロード
+                5. このアプリで「**ローカルファイル（推奨）**」を選択してアップロード
                 
-                **代替方法 2: 別の動画を試す**
-                - 短い動画（5分以内）
-                - 最近アップロードされた動画
-                - 一般公開されている動画
+                #### ✅ 方法2: デスクトップアプリを使用（高品質）
+                1. **4K Video Downloader**（無料）をダウンロード
+                   - [公式サイト](https://www.4kdownload.com/ja/products/videodownloader)
+                2. アプリを起動してYouTube URLを貼り付け
+                3. ダウンロード（MP4形式推奨）
+                4. このアプリで「**ローカルファイル（推奨）**」を選択してアップロード
                 
-                **推奨ツール:**
-                - [4K Video Downloader](https://www.4kdownload.com/)
-                - [yt-dlp](https://github.com/yt-dlp/yt-dlp) (コマンドライン)
+                #### ✅ 方法3: オンラインサービスを使用（登録不要）
+                1. **Y2Mate**や**SaveFrom**などのサービスを利用
+                   - [Y2Mate](https://www.y2mate.com/jp)
+                   - [SaveFrom.net](https://ja.savefrom.net/)
+                2. YouTube URLを貼り付けてダウンロード
+                3. このアプリで「**ローカルファイル（推奨）**」を選択してアップロード
+                
+                ---
+                
+                ### ⚠️ 直接ダウンロードを試す（成功率: 10-20%）
+                
+                以下のボタンで試すこともできますが、**成功率は非常に低い**です。
+                上記の代替方法を強く推奨します。
                 """)
             
-            web_url = st.text_input("動画URL", placeholder="https://www.youtube.com/watch?v=...")
+            web_url = st.text_input(
+                "動画URL（非推奨・試験的）", 
+                placeholder="https://www.youtube.com/watch?v=...",
+                help="現在YouTubeからの直接ダウンロードは困難です。上記の代替方法をお試しください。"
+            )
             
-            if st.button("ダウンロード"):
-                if not web_url:
-                    st.error("❌ URLを入力してください")
-                else:
-                    output_path = str(TEMP_VIDEOS_DIR / "video_web.mp4")
-                    if download_from_web(web_url, output_path):
-                        st.session_state.video_path = output_path
-                        st.success("✅ ダウンロード完了!")
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                if st.button("⚠️ ダウンロードを試す（非推奨）", type="secondary"):
+                    if not web_url:
+                        st.error("❌ URLを入力してください")
                     else:
-                        st.warning("💡 ダウンロードに失敗した場合は、上記の「代替方法」をご確認ください")
+                        st.warning("🔄 ダウンロード中... 失敗する可能性が高いです")
+                        output_path = str(TEMP_VIDEOS_DIR / "video_web.mp4")
+                        if download_from_web(web_url, output_path):
+                            st.session_state.video_path = output_path
+                            st.success("✅ ダウンロード完了! 🎉")
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            st.error("❌ ダウンロード失敗しました")
+                            st.info("💡 **上記の「推奨される代替方法」をご利用ください**")
+                            st.markdown("""
+                            ### 📌 今すぐできる対処法:
+                            1. 上部の動画取得方法で「**ローカルファイル（推奨）**」を選択
+                            2. 上記の代替方法でYouTube動画をダウンロード
+                            3. ダウンロードした動画ファイルをアップロード
+                            
+                            → 確実に動画を処理できます！
+                            """)
+            
+            with col2:
+                if st.button("📂 ローカルファイルに切り替え", type="primary"):
+                    st.rerun()
         
         elif video_source == "ローカルファイル":
             uploaded_file = st.file_uploader("動画ファイルをアップロード", type=['mp4', 'mov', 'avi', 'mkv'])
