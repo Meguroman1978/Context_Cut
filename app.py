@@ -388,20 +388,94 @@ def download_from_google_drive(file_id: str, output_path: str) -> bool:
 def download_from_web(url: str, output_path: str) -> bool:
     """Web URLから動画をダウンロード（yt-dlp使用）"""
     try:
+        # 出力パスから拡張子を除去（yt-dlpが自動的に付与）
+        output_template = str(Path(output_path).with_suffix(''))
+        
         ydl_opts = {
-            'format': 'best[ext=mp4]/best',
-            'outtmpl': output_path,
+            # フォーマット選択: 720p以下のMP4を優先、なければベスト品質
+            'format': 'bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best',
+            'outtmpl': output_template,
+            'merge_output_format': 'mp4',
             'quiet': False,
             'no_warnings': False,
+            # エラー回避設定
+            'nocheckcertificate': True,
+            'ignoreerrors': False,
+            'no_color': True,
+            # Cookie・認証関連
+            'cookiefile': None,
+            'username': None,
+            'password': None,
+            # 追加のヘッダー設定
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-us,en;q=0.5',
+                'Sec-Fetch-Mode': 'navigate',
+            },
+            # プログレス表示
+            'progress_hooks': [],
         }
         
+        st.info(f"🔄 動画をダウンロード中... URL: {url}")
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            st.info("動画をダウンロード中...")
+            # 動画情報を取得
+            info = ydl.extract_info(url, download=False)
+            video_title = info.get('title', 'Unknown')
+            duration = info.get('duration', 0)
+            st.info(f"📹 タイトル: {video_title}")
+            st.info(f"⏱️ 長さ: {duration//60}分{duration%60}秒")
+            
+            # ダウンロード実行
             ydl.download([url])
         
+        # ダウンロードされたファイルを確認
+        possible_extensions = ['.mp4', '.webm', '.mkv', '.flv']
+        downloaded_file = None
+        
+        for ext in possible_extensions:
+            check_path = Path(output_template + ext)
+            if check_path.exists() and check_path.stat().st_size > 0:
+                downloaded_file = check_path
+                break
+        
+        if not downloaded_file:
+            st.error("❌ ダウンロードされたファイルが見つかりません")
+            return False
+        
+        # 出力パスにリネーム（必要に応じて）
+        if str(downloaded_file) != output_path:
+            import shutil
+            shutil.move(str(downloaded_file), output_path)
+        
+        # ファイルサイズを確認
+        file_size = Path(output_path).stat().st_size
+        if file_size == 0:
+            st.error("❌ ダウンロードされたファイルが空です")
+            return False
+        
+        st.success(f"✅ ダウンロード完了！ (ファイルサイズ: {file_size/1024/1024:.1f}MB)")
         return True
+        
+    except yt_dlp.utils.DownloadError as e:
+        error_msg = str(e)
+        if "Sign in to confirm you're not a bot" in error_msg or "Sign in" in error_msg:
+            st.error("❌ YouTubeがボット検出を実施しています。")
+            st.info("💡 **対処法**:")
+            st.info("1. 数分待ってから再試行してください")
+            st.info("2. 別の動画URLを試してください")
+            st.info("3. YouTubeの短い動画（5分以内）を試してください")
+        elif "Private video" in error_msg:
+            st.error("❌ この動画は非公開です")
+        elif "Video unavailable" in error_msg:
+            st.error("❌ この動画は利用できません")
+        else:
+            st.error(f"❌ ダウンロードエラー: {error_msg}")
+        return False
     except Exception as e:
-        st.error(f"Web URLからのダウンロードに失敗しました: {e}")
+        st.error(f"❌ Web URLからのダウンロードに失敗しました: {e}")
+        st.info("💡 別の動画URLを試すか、ローカルファイルのアップロードをご利用ください")
         return False
 
 
