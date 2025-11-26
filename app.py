@@ -2358,7 +2358,6 @@ def main():
                 st.write(f"**video_path設定済み:** {bool(st.session_state.get('video_path'))}")
                 if st.session_state.get('video_path'):
                     st.write(f"**video_path:** `{st.session_state.video_path}`")
-                    from pathlib import Path
                     st.write(f"**video_name (stem):** `{Path(st.session_state.video_path).stem}`")
                 st.write(f"**transcription設定済み:** {bool(st.session_state.get('transcription'))}")
                 st.write(f"**collection_name:** {st.session_state.get('collection_name', 'None')}")
