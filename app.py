@@ -413,38 +413,25 @@ def download_from_web(url: str, output_path: str) -> bool:
         st.info("💡 aria2c が見つかりません。通常モードでダウンロードします")
     
     # ダウンロード戦略（優先度順）
+    # Streamlit Cloud環境ではブラウザcookieは利用不可なので、cookieなし戦略を優先
     strategies = [
         {
-            'name': '🚀 高速モード（aria2c + 並列DL）',
+            'name': '📺 標準HD設定（並列DL）',
             'format': 'bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best',
-            'use_aria2c': True,
-            'concurrent_fragments': 8,
+            'use_aria2c': False,
+            'concurrent_fragments': 5,
             'cookiesbrowser': None,
         },
         {
-            'name': '🍪 Cookie認証 + 並列DL（Chrome）',
-            'format': 'bestvideo[ext=mp4][height<=720]+bestaudio/best[ext=mp4]/best',
-            'use_aria2c': aria2c_available,
-            'concurrent_fragments': 5,
-            'cookiesbrowser': 'chrome',
-        },
-        {
-            'name': '🍪 Cookie認証 + 並列DL（Firefox）',
-            'format': 'bestvideo[ext=mp4][height<=720]+bestaudio/best[ext=mp4]/best',
-            'use_aria2c': aria2c_available,
-            'concurrent_fragments': 5,
-            'cookiesbrowser': 'firefox',
-        },
-        {
-            'name': '📺 標準HD設定（音声+映像）',
-            'format': 'bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best',
+            'name': '📺 標準HD設定（シンプル）',
+            'format': 'best[ext=mp4][height<=720]/best[height<=720]/best',
             'use_aria2c': False,
-            'concurrent_fragments': 3,
+            'concurrent_fragments': 1,
             'cookiesbrowser': None,
         },
         {
             'name': '📉 低画質設定（480p）',
-            'format': 'bestvideo[ext=mp4][height<=480]+bestaudio/best[height<=480]/best',
+            'format': 'best[ext=mp4][height<=480]/best[height<=480]/best',
             'use_aria2c': False,
             'concurrent_fragments': 1,
             'cookiesbrowser': None,
@@ -495,21 +482,8 @@ def download_from_web(url: str, output_path: str) -> bool:
                 }
             }
             
-            # aria2c 外部ダウンローダー設定（分割並列ダウンロード）
-            if strategy.get('use_aria2c') and aria2c_available:
-                ydl_opts['external_downloader'] = 'aria2c'
-                # aria2c オプション: 16並列接続、16分割、1MBチャンク
-                ydl_opts['external_downloader_args'] = ['-x', '16', '-s', '16', '-k', '1M', '--file-allocation=none']
-                st.info("⚡ aria2c で並列ダウンロード: 16接続×16分割")
-            
-            # ブラウザcookieを使用（年齢制限・地域制限回避）
-            if strategy.get('cookiesbrowser'):
-                try:
-                    ydl_opts['cookiesfrombrowser'] = (strategy['cookiesbrowser'],)
-                    st.info(f"🍪 {strategy['cookiesbrowser'].capitalize()} のcookieを使用")
-                except Exception as cookie_error:
-                    st.warning(f"⚠️ ブラウザcookieの読み込み失敗: {cookie_error}")
-                    continue  # このストラテジーをスキップ
+            # aria2cは環境によって不安定なため無効化
+            # Streamlit Cloud環境ではブラウザcookieは利用不可
             
             if idx == 0:
                 st.info(f"📹 動画URL: {url}")
@@ -2483,7 +2457,8 @@ def main():
             # 文字起こしがスキップされた場合の警告
             if st.session_state.get('skip_transcription', False):
                 st.warning("⚠️ 文字起こしがスキップされたため、シーン検索機能は使用できません。")
-                st.info("💡 シーン検索を使用する場合は、サイドバーから「文字起こしを実行」を行ってください。\n\nまたは、「✂️ カット範囲指定」タブで手動で範囲を指定してください。")
+                st.info("💡 シーン検索を使用する場合は、サイドバーから「文字起こしを実行」を行ってください。\n\nまたは、「動画編集」タブで手動で範囲を指定してください。")
+                search_query = ""  # 空の検索クエリを設定
             else:
                 # 検索クエリ候補がクリックされた場合、それを入力欄に設定
                 if 'selected_suggestion' in st.session_state:
@@ -3095,10 +3070,67 @@ def main():
                         selected_font_file = selected_font_name.replace(" ", "_") + ".ttf"
                         
                         st.info(f"**選択中のフォント**: {selected_font_name}")
+                        
+                        # フォントプレビュー（背景画像がある場合は組み合わせて表示）
                         font_path = FONTS_DIR / selected_font_file
                         if font_path.exists():
-                            large_preview = generate_font_preview(str(font_path), text_content if text_content else preview_text, size=40)
-                            st.image(large_preview, caption=f"{selected_font_name} の大きなプレビュー", use_container_width=True)
+                            # 背景画像が選択されている場合
+                            if st.session_state.get('preview_with_background') and st.session_state.get('preview_bg_path'):
+                                try:
+                                    from PIL import Image, ImageDraw, ImageFont
+                                    
+                                    # 背景画像を読み込み
+                                    bg_img = Image.open(st.session_state.preview_bg_path)
+                                    
+                                    # 適切なサイズにリサイズ（最大幅800px）
+                                    max_width = 800
+                                    if bg_img.width > max_width:
+                                        ratio = max_width / bg_img.width
+                                        new_size = (max_width, int(bg_img.height * ratio))
+                                        bg_img = bg_img.resize(new_size, Image.LANCZOS)
+                                    
+                                    # RGB変換（透過がある場合）
+                                    if bg_img.mode != 'RGB':
+                                        # 白背景で合成
+                                        white_bg = Image.new('RGB', bg_img.size, (255, 255, 255))
+                                        if bg_img.mode == 'RGBA':
+                                            white_bg.paste(bg_img, mask=bg_img.split()[3])
+                                        else:
+                                            white_bg.paste(bg_img)
+                                        bg_img = white_bg
+                                    
+                                    # テキストを中央に描画
+                                    draw = ImageDraw.Draw(bg_img)
+                                    font_size = 40
+                                    font = ImageFont.truetype(str(font_path), font_size)
+                                    
+                                    preview_text_to_draw = text_content if text_content else preview_text
+                                    
+                                    # テキストのバウンディングボックスを取得
+                                    bbox = draw.textbbox((0, 0), preview_text_to_draw, font=font)
+                                    text_width = bbox[2] - bbox[0]
+                                    text_height = bbox[3] - bbox[1]
+                                    
+                                    # 中央に配置
+                                    x = (bg_img.width - text_width) // 2
+                                    y = (bg_img.height - text_height) // 2
+                                    
+                                    # 影を追加（見やすくするため）
+                                    shadow_offset = 2
+                                    draw.text((x + shadow_offset, y + shadow_offset), preview_text_to_draw, font=font, fill=(0, 0, 0))
+                                    # テキストを描画
+                                    draw.text((x, y), preview_text_to_draw, font=font, fill=(255, 255, 255))
+                                    
+                                    st.image(bg_img, caption=f"{selected_font_name} + 背景画像のプレビュー", use_container_width=True)
+                                except Exception as e:
+                                    st.warning(f"背景付きプレビューの生成に失敗: {e}")
+                                    # 通常のフォントプレビューにフォールバック
+                                    large_preview = generate_font_preview(str(font_path), text_content if text_content else preview_text, size=40)
+                                    st.image(large_preview, caption=f"{selected_font_name} のプレビュー", use_container_width=True)
+                            else:
+                                # 通常のフォントプレビュー
+                                large_preview = generate_font_preview(str(font_path), text_content if text_content else preview_text, size=40)
+                                st.image(large_preview, caption=f"{selected_font_name} のプレビュー", use_container_width=True)
                         else:
                             st.warning(f"{selected_font_name} をダウンロードしてください")
                         
@@ -3140,6 +3172,11 @@ def main():
                         text_bg_scale = 1.0
                         text_bg_opacity = 1.0
                         
+                        # 背景なしの場合はプレビューフラグをクリア
+                        if background_mode == "⛔ 設定しない":
+                            st.session_state.preview_with_background = False
+                            st.session_state.preview_bg_path = None
+                        
                         if background_mode == "📚 プリセットから選択":
                             # プリセット背景画像を取得
                             preset_backgrounds = list(TEXT_BACKGROUNDS_DIR.glob("*.png")) + list(TEXT_BACKGROUNDS_DIR.glob("*.jpg"))
@@ -3151,6 +3188,10 @@ def main():
                                     key="text_preset_bg"
                                 )
                                 text_bg_path = str(TEXT_BACKGROUNDS_DIR / f"{selected_bg_name}{[bg for bg in preset_backgrounds if bg.stem == selected_bg_name][0].suffix}")
+                                
+                                # プレビュー用にセッション状態を更新
+                                st.session_state.preview_bg_path = text_bg_path
+                                st.session_state.preview_with_background = True
                                 
                                 # プレビュー表示
                                 if Path(text_bg_path).exists():
@@ -3171,6 +3212,11 @@ def main():
                                 with open(custom_bg_path, 'wb') as f:
                                     f.write(custom_bg_file.getbuffer())
                                 text_bg_path = str(custom_bg_path)
+                                
+                                # プレビュー用にセッション状態を更新
+                                st.session_state.preview_bg_path = text_bg_path
+                                st.session_state.preview_with_background = True
+                                
                                 st.image(custom_bg_path, caption="アップロードした背景", width=200)
                         
                         # 背景画像が設定されている場合の調整オプション
