@@ -2147,6 +2147,13 @@ def main():
                         file_id = st.session_state.gdrive_selected_file
                         output_path = str(TEMP_VIDEOS_DIR / f"video_{file_id}.mp4")
                         if download_from_google_drive(file_id, output_path):
+                            # 🆕 新しい動画がダウンロードされた場合、古い状態をクリア
+                            if st.session_state.get('video_path') != output_path:
+                                st.session_state.transcription = None
+                                st.session_state.collection_name = None
+                                st.session_state.search_results = []
+                                st.session_state.skip_transcription = False
+                            
                             st.session_state.video_path = output_path
                             st.success("✅ ダウンロード完了!")
                             # セッション状態をクリア
@@ -2177,6 +2184,13 @@ def main():
                         st.info("🔄 ダウンロード中...")
                         output_path = str(TEMP_VIDEOS_DIR / "video_web.mp4")
                         if download_from_web(web_url, output_path):
+                            # 🆕 新しい動画がダウンロードされた場合、古い状態をクリア
+                            if st.session_state.get('video_path') != output_path:
+                                st.session_state.transcription = None
+                                st.session_state.collection_name = None
+                                st.session_state.search_results = []
+                                st.session_state.skip_transcription = False
+                            
                             st.session_state.video_path = output_path
                             st.success("✅ ダウンロード完了! 🎉")
                             st.balloons()
@@ -2203,6 +2217,13 @@ def main():
             uploaded_file = st.file_uploader("動画ファイルをアップロード", type=['mp4', 'mov', 'avi', 'mkv'])
             if uploaded_file:
                 output_path = str(TEMP_VIDEOS_DIR / uploaded_file.name)
+                # 🆕 新しい動画がアップロードされた場合、古い状態をクリア
+                if st.session_state.get('video_path') != output_path:
+                    st.session_state.transcription = None
+                    st.session_state.collection_name = None
+                    st.session_state.search_results = []
+                    st.session_state.skip_transcription = False
+                
                 with open(output_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 st.session_state.video_path = output_path
@@ -2335,6 +2356,10 @@ def main():
             # 🆕 デバッグ情報（開発用）
             with st.expander("🔧 デバッグ情報", expanded=False):
                 st.write(f"**video_path設定済み:** {bool(st.session_state.get('video_path'))}")
+                if st.session_state.get('video_path'):
+                    st.write(f"**video_path:** `{st.session_state.video_path}`")
+                    from pathlib import Path
+                    st.write(f"**video_name (stem):** `{Path(st.session_state.video_path).stem}`")
                 st.write(f"**transcription設定済み:** {bool(st.session_state.get('transcription'))}")
                 st.write(f"**collection_name:** {st.session_state.get('collection_name', 'None')}")
                 st.write(f"**chromadb_client設定済み:** {st.session_state.get('chromadb_client') is not None}")
