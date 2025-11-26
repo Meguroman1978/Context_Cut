@@ -2,7 +2,17 @@
 
 このディレクトリには、テキストレイヤーで使用できるプリセット背景画像が保存されています。
 
-## 現在のプリセット背景（18種類）
+## 現在のプリセット背景（26種類）
+
+### 吹き出し（透過PNG）
+- `speech_bubble_1.png` - 楕円形吹き出し（黒）
+- `speech_bubble_2.png` - 楕円形吹き出し（黒・太線）
+- `speech_bubble_3.png` - 爆発型吹き出し
+- `speech_bubble_4.png` - 五角形吹き出し
+- `speech_bubble_5.png` - 円形集中線吹き出し
+- `speech_bubble_6.png` - 長方形吹き出し（黒）
+- `speech_bubble_7.png` - 雲型吹き出し
+- `speech_bubble_8.png` - 長方形吹き出し（細枠）
 
 ### シンプル背景
 - `simple_white_80.png` - 白色（透明度80%）

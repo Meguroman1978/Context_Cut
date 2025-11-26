@@ -391,8 +391,29 @@ def download_from_web(url: str, output_path: str) -> bool:
     # 出力パスから拡張子を除去（yt-dlpが自動的に付与）
     output_template = str(Path(output_path).with_suffix(''))
     
-    # 複数の設定を試す戦略
+    # 複数の設定を試す戦略（bot detection回避強化版）
     strategies = [
+        {
+            'name': 'iOS専用設定（最新）',
+            'format': 'bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best',
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['ios', 'mweb'],
+                    'player_skip': ['webpage', 'js', 'configs'],
+                    'skip': ['dash', 'hls'],
+                }
+            }
+        },
+        {
+            'name': 'Android TV設定（bot回避）',
+            'format': 'bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best',
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android_embedded', 'android', 'tv_embedded'],
+                    'player_skip': ['webpage'],
+                }
+            }
+        },
         {
             'name': '標準設定（高画質）',
             'format': 'bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best',
@@ -413,18 +434,22 @@ def download_from_web(url: str, output_path: str) -> bool:
             }
         },
         {
-            'name': 'モバイル設定',
+            'name': 'モバイルWeb設定',
             'format': 'best[ext=mp4]/best',
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'ios'],
+                    'player_client': ['mweb', 'android'],
                 }
             }
         },
         {
             'name': '最低品質（フォールバック）',
             'format': 'worst',
-            'extractor_args': {}
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android_creator'],
+                }
+            }
         }
     ]
     
@@ -443,26 +468,32 @@ def download_from_web(url: str, output_path: str) -> bool:
                 'ignoreerrors': False,
                 'no_color': True,
                 'extractor_args': strategy['extractor_args'],
-                # より強力なヘッダー設定
+                # より強力なヘッダー設定（iOS/Androidを装う）
                 'http_headers': {
-                    'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+                    'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)' if 'ios' in str(strategy['extractor_args']) else 
+                                  'com.google.android.youtube/19.29.37 (Linux; U; Android 13) gzip',
                     'Accept': '*/*',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Accept-Encoding': 'gzip, deflate',
-                    'Origin': 'https://www.youtube.com',
-                    'Referer': 'https://www.youtube.com/',
-                    'Sec-Fetch-Dest': 'empty',
-                    'Sec-Fetch-Mode': 'cors',
-                    'Sec-Fetch-Site': 'cross-site',
+                    'Accept-Language': 'en-US,en;q=0.9,ja;q=0.8',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'X-YouTube-Client-Name': '2',
+                    'X-YouTube-Client-Version': '2.20231219.04.00',
                 },
-                # YouTube特有の設定
+                # YouTube特有の設定（bot検出回避強化）
                 'age_limit': None,
                 'geo_bypass': True,
                 'geo_bypass_country': 'US',
                 # リトライ設定
-                'retries': 3,
-                'fragment_retries': 3,
+                'retries': 5,
+                'fragment_retries': 5,
                 'skip_unavailable_fragments': True,
+                # bot検出回避（重要）
+                'extractor_retries': 3,
+                'file_access_retries': 3,
+                'sleep_interval': 1,
+                'max_sleep_interval': 5,
+                # 追加の安全設定
+                'verbose': False,
+                'no_check_certificate': True,
             }
             
             if idx == 0:
